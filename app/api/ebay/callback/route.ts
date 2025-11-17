@@ -31,21 +31,28 @@ export async function GET(req: Request) {
       )
     }
 
-    // Exchange authorization code for access token
-    const tokenResponse = await fetch("https://api.sandbox.ebay.com/identity/v1/oauth2/token", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        Authorization: `Basic ${Buffer.from(
-          `${process.env.EBAY_CLIENT_ID}:${process.env.EBAY_CLIENT_SECRET}`
-        ).toString("base64")}`,
-      },
-      body: new URLSearchParams({
-        grant_type: "authorization_code",
-        code,
-        redirect_uri: process.env.EBAY_REDIRECT_URI || `${process.env.NEXTAUTH_URL}/api/ebay/callback`,
-      }),
-    })
+        // Exchange authorization code for access token
+        const isSandbox = process.env.EBAY_SANDBOX === "true"
+        const tokenEndpoint = isSandbox
+          ? "https://api.sandbox.ebay.com/identity/v1/oauth2/token"
+          : "https://api.ebay.com/identity/v1/oauth2/token"
+        
+        const ruName = process.env.EBAY_RUNAME || process.env.EBAY_REDIRECT_URI
+        
+        const tokenResponse = await fetch(tokenEndpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            Authorization: `Basic ${Buffer.from(
+              `${process.env.EBAY_CLIENT_ID}:${process.env.EBAY_CLIENT_SECRET}`
+            ).toString("base64")}`,
+          },
+          body: new URLSearchParams({
+            grant_type: "authorization_code",
+            code,
+            redirect_uri: ruName,
+          }),
+        })
 
     if (!tokenResponse.ok) {
       const errorData = await tokenResponse.json()

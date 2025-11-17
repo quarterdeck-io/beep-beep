@@ -153,10 +153,13 @@ DATABASE_URL="postgresql://yourusername@localhost:5432/beepbeep?schema=public"
 NEXTAUTH_SECRET="your-secret-key-here"  # Generate with: openssl rand -base64 32
 NEXTAUTH_URL="http://localhost:3000"
 
-# eBay API (Optional - for eBay integration)
+# eBay API (Required for eBay integration)
+# ⚠️ eBay uses RuName (NOT a regular URL) - See EBAY_OAUTH_SETUP.md for details
+# EBAY_SANDBOX="true"
 # EBAY_CLIENT_ID="your-ebay-client-id"
 # EBAY_CLIENT_SECRET="your-ebay-client-secret"
-# EBAY_REDIRECT_URI="http://localhost:3000/api/ebay/callback"
+# EBAY_RUNAME="your-ebay-runame-from-developer-portal"
+# EBAY_SCOPE="https://api.ebay.com/oauth/api_scope"
 ```
 
 **Windows (if you set a password):**
@@ -168,10 +171,13 @@ DATABASE_URL="postgresql://postgres:yourpassword@localhost:5432/beepbeep?schema=
 NEXTAUTH_SECRET="your-secret-key-here"
 NEXTAUTH_URL="http://localhost:3000"
 
-# eBay API (Optional)
+# eBay API (Required for eBay integration)
+# ⚠️ eBay uses RuName (NOT a regular URL) - See EBAY_OAUTH_SETUP.md for details
+# EBAY_SANDBOX="true"
 # EBAY_CLIENT_ID="your-ebay-client-id"
 # EBAY_CLIENT_SECRET="your-ebay-client-secret"
-# EBAY_REDIRECT_URI="http://localhost:3000/api/ebay/callback"
+# EBAY_RUNAME="your-ebay-runame-from-developer-portal"
+# EBAY_SCOPE="https://api.ebay.com/oauth/api_scope"
 ```
 
 Also create a `.env` file for Prisma (same DATABASE_URL as above):
@@ -190,6 +196,16 @@ DATABASE_URL="postgresql://yourusername@localhost:5432/beepbeep?schema=public"
   ```powershell
   [Convert]::ToBase64String((1..32 | ForEach-Object { Get-Random -Maximum 256 }))
   ```
+
+**⚠️ Important: eBay OAuth Setup**
+
+eBay uses a **RuName (Redirect URL name)** instead of regular callback URLs. This is different from most OAuth providers!
+
+📖 **See [EBAY_OAUTH_SETUP.md](./EBAY_OAUTH_SETUP.md) for detailed instructions** on:
+- How to get your RuName from eBay Developer Portal
+- Sandbox vs Production configuration
+- OAuth scopes and permissions
+- Troubleshooting common issues
 
 ### 5. Set Up the Database
 
