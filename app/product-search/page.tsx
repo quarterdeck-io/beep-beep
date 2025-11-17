@@ -1,7 +1,9 @@
 "use client"
 
 import Navigation from "@/components/Navigation"
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
+import Link from "next/link"
 
 interface ProductData {
   title?: string
@@ -22,10 +24,30 @@ interface ProductData {
 }
 
 export default function ProductSearchPage() {
+  const router = useRouter()
   const [upc, setUpc] = useState("")
   const [loading, setLoading] = useState(false)
+  const [checking, setChecking] = useState(true)
+  const [isConnected, setIsConnected] = useState(false)
   const [error, setError] = useState("")
   const [productData, setProductData] = useState<ProductData | null>(null)
+
+  useEffect(() => {
+    // Check if user has connected eBay account
+    const checkEbayConnection = async () => {
+      try {
+        const res = await fetch("/api/ebay/check-connection")
+        const data = await res.json()
+        setIsConnected(data.connected)
+      } catch (err) {
+        setIsConnected(false)
+      } finally {
+        setChecking(false)
+      }
+    }
+
+    checkEbayConnection()
+  }, [])
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -50,6 +72,62 @@ export default function ProductSearchPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  if (checking) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+        <Navigation />
+        <div className="max-w-6xl mx-auto py-6 sm:px-6 lg:px-8">
+          <div className="px-4 py-6 sm:px-0 text-center">
+            <div className="text-gray-600 dark:text-gray-400">Checking eBay connection...</div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (!isConnected) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+        <Navigation />
+        <div className="max-w-6xl mx-auto py-6 sm:px-6 lg:px-8">
+          <div className="px-4 py-6 sm:px-0">
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-6">
+              Product Search
+            </h1>
+
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-8 text-center">
+              <svg
+                className="mx-auto h-16 w-16 text-yellow-400 mb-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                />
+              </svg>
+              <h2 className="text-2xl font-bold text-yellow-800 dark:text-yellow-400 mb-4">
+                eBay Account Not Connected
+              </h2>
+              <p className="text-yellow-700 dark:text-yellow-300 mb-6">
+                You need to connect your eBay account via OAuth before you can search for products.
+              </p>
+              <Link
+                href="/ebay-connect"
+                className="inline-block px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors duration-200"
+              >
+                Connect eBay Account
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
