@@ -1,21 +1,56 @@
 "use client"
 
 import Navigation from "@/components/Navigation"
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useSearchParams } from "next/navigation"
+import Link from "next/link"
 
 export default function EbayConnectPage() {
+  const searchParams = useSearchParams()
   const [connecting, setConnecting] = useState(false)
-  const [accessToken, setAccessToken] = useState("")
+  const [isConnected, setIsConnected] = useState(false)
   const [message, setMessage] = useState("")
+  const [error, setError] = useState("")
 
-  const handleConnect = async () => {
+  useEffect(() => {
+    // Check if already connected
+    const checkConnection = async () => {
+      try {
+        const res = await fetch("/api/ebay/check-connection")
+        const data = await res.json()
+        setIsConnected(data.connected)
+      } catch (err) {
+        console.error("Failed to check connection:", err)
+      }
+    }
+
+    checkConnection()
+
+    // Handle OAuth callback success/error
+    const success = searchParams.get("success")
+    const errorParam = searchParams.get("error")
+
+    if (success === "true") {
+      setMessage("✓ Successfully connected to eBay!")
+      setIsConnected(true)
+    } else if (errorParam) {
+      const errorMessages: Record<string, string> = {
+        missing_credentials: "eBay API credentials not configured. Please add EBAY_CLIENT_ID and EBAY_CLIENT_SECRET to your .env.local file.",
+        oauth_failed: "Failed to initiate OAuth flow. Please try again.",
+        oauth_declined: "You declined the eBay authorization.",
+        unauthorized: "Unauthorized request. Please try again.",
+        no_code: "No authorization code received from eBay.",
+        token_exchange_failed: "Failed to exchange authorization code for access token.",
+        callback_failed: "OAuth callback failed. Please try again."
+      }
+      setError(errorMessages[errorParam] || "An unknown error occurred")
+    }
+  }, [searchParams])
+
+  const handleConnect = () => {
     setConnecting(true)
-    setMessage("eBay OAuth integration is being configured. Please add your eBay API credentials to continue.")
-    
-    // This is a placeholder for the eBay OAuth flow
-    // You will implement the actual OAuth flow here with your eBay credentials
-    
-    setConnecting(false)
+    // Redirect to OAuth flow
+    window.location.href = "/api/ebay/connect"
   }
 
   return (
@@ -37,34 +72,60 @@ export default function EbayConnectPage() {
             </p>
 
             {message && (
-              <div className="mb-4 p-4 bg-blue-100 dark:bg-blue-900/30 border border-blue-400 dark:border-blue-700 text-blue-700 dark:text-blue-400 rounded">
+              <div className="mb-4 p-4 bg-green-100 dark:bg-green-900/30 border border-green-400 dark:border-green-700 text-green-700 dark:text-green-400 rounded">
                 {message}
               </div>
             )}
 
-            <div className="space-y-4">
-              <button
-                onClick={handleConnect}
-                disabled={connecting}
-                className="w-full sm:w-auto px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold rounded-lg transition-colors duration-200"
-              >
-                {connecting ? "Connecting..." : "Connect eBay Account"}
-              </button>
+            {error && (
+              <div className="mb-4 p-4 bg-red-100 dark:bg-red-900/30 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-400 rounded">
+                {error}
+              </div>
+            )}
 
-              {accessToken && (
-                <div className="mt-6">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                    Access Token (Preview)
-                  </h3>
-                  <div className="bg-gray-100 dark:bg-gray-700 p-4 rounded font-mono text-sm break-all">
-                    {accessToken.substring(0, 50)}...
+            {isConnected ? (
+              <div className="space-y-4">
+                <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <svg className="w-6 h-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <div>
+                      <h3 className="font-semibold text-green-800 dark:text-green-400">
+                        eBay Account Connected
+                      </h3>
+                      <p className="text-sm text-green-700 dark:text-green-300">
+                        You can now search for products!
+                      </p>
+                    </div>
                   </div>
-                  <p className="mt-2 text-sm text-green-600 dark:text-green-400">
-                    ✓ Successfully connected to eBay
-                  </p>
                 </div>
-              )}
-            </div>
+                <div className="flex gap-3">
+                  <Link
+                    href="/product-search"
+                    className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors duration-200"
+                  >
+                    Search Products
+                  </Link>
+                  <Link
+                    href="/dashboard"
+                    className="px-6 py-3 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-semibold rounded-lg transition-colors duration-200"
+                  >
+                    Go to Dashboard
+                  </Link>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <button
+                  onClick={handleConnect}
+                  disabled={connecting}
+                  className="w-full sm:w-auto px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold rounded-lg transition-colors duration-200"
+                >
+                  {connecting ? "Redirecting to eBay..." : "Connect eBay Account"}
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-6">
