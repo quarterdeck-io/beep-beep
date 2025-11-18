@@ -18,10 +18,13 @@ services:
         generateValue: true
       - key: NEXTAUTH_URL
         sync: false
+      - key: PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING
+        value: "1"
       # Add these manually in Render dashboard:
       # - EBAY_CLIENT_ID
       # - EBAY_CLIENT_SECRET
       # - EBAY_REDIRECT_URI
+      # - EBAY_RUNAME
 
 # Database (PostgreSQL)
 databases:
