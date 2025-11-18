@@ -19,14 +19,14 @@ export const authOptions: NextAuthConfig = {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
       },
-      async authorize(credentials) {
+      async authorize(credentials): Promise<any> {
         if (!credentials?.email || !credentials?.password) {
           throw new Error("Email and password required")
         }
 
         const user = await prisma.user.findUnique({
           where: {
-            email: credentials.email,
+            email: credentials.email as string,
           },
         })
 
@@ -34,7 +34,7 @@ export const authOptions: NextAuthConfig = {
           throw new Error("Invalid email or password")
         }
 
-        const isPasswordValid = await compare(credentials.password, user.password)
+        const isPasswordValid = await compare(credentials.password as string, user.password)
 
         if (!isPasswordValid) {
           throw new Error("Invalid email or password")

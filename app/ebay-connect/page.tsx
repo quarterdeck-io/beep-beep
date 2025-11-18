@@ -1,11 +1,11 @@
 "use client"
 
 import Navigation from "@/components/Navigation"
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import Link from "next/link"
 
-export default function EbayConnectPage() {
+function EbayConnectContent() {
   const searchParams = useSearchParams()
   const [connecting, setConnecting] = useState(false)
   const [isConnected, setIsConnected] = useState(false)
@@ -142,6 +142,21 @@ export default function EbayConnectPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function EbayConnectPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+        <Navigation />
+        <div className="max-w-4xl mx-auto py-6 sm:px-6 lg:px-8">
+          <div className="px-4 py-6 sm:px-0">Loading...</div>
+        </div>
+      </div>
+    }>
+      <EbayConnectContent />
+    </Suspense>
   )
 }
 

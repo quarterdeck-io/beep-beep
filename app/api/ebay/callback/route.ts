@@ -31,28 +31,35 @@ export async function GET(req: Request) {
       )
     }
 
-        // Exchange authorization code for access token
-        const isSandbox = process.env.EBAY_SANDBOX === "true"
-        const tokenEndpoint = isSandbox
-          ? "https://api.sandbox.ebay.com/identity/v1/oauth2/token"
-          : "https://api.ebay.com/identity/v1/oauth2/token"
-        
-        const ruName = process.env.EBAY_RUNAME || process.env.EBAY_REDIRECT_URI
-        
-        const tokenResponse = await fetch(tokenEndpoint, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded",
-            Authorization: `Basic ${Buffer.from(
-              `${process.env.EBAY_CLIENT_ID}:${process.env.EBAY_CLIENT_SECRET}`
-            ).toString("base64")}`,
-          },
-          body: new URLSearchParams({
-            grant_type: "authorization_code",
-            code,
-            redirect_uri: ruName,
-          }),
-        })
+    // Exchange authorization code for access token
+    const isSandbox = process.env.EBAY_SANDBOX === "true"
+    const tokenEndpoint = isSandbox
+      ? "https://api.sandbox.ebay.com/identity/v1/oauth2/token"
+      : "https://api.ebay.com/identity/v1/oauth2/token"
+    
+    const ruName = process.env.EBAY_RUNAME || process.env.EBAY_REDIRECT_URI
+    
+    if (!ruName) {
+      console.error("EBAY_RUNAME or EBAY_REDIRECT_URI is not configured")
+      return NextResponse.redirect(
+        new URL("/ebay-connect?error=misconfigured", process.env.NEXTAUTH_URL || "http://localhost:3000")
+      )
+    }
+    
+    const tokenResponse = await fetch(tokenEndpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Authorization: `Basic ${Buffer.from(
+          `${process.env.EBAY_CLIENT_ID}:${process.env.EBAY_CLIENT_SECRET}`
+        ).toString("base64")}`,
+      },
+      body: new URLSearchParams({
+        grant_type: "authorization_code",
+        code,
+        redirect_uri: ruName,
+      }),
+    })
 
     if (!tokenResponse.ok) {
       const errorData = await tokenResponse.json()

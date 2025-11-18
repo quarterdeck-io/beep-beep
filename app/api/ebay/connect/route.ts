@@ -22,6 +22,12 @@ export async function GET() {
     const ruName = process.env.EBAY_RUNAME || process.env.EBAY_REDIRECT_URI
     const scope = process.env.EBAY_SCOPE || "https://api.ebay.com/oauth/api_scope"
     
+    if (!ruName) {
+      return NextResponse.redirect(
+        new URL("/ebay-connect?error=missing_runame", process.env.NEXTAUTH_URL || "http://localhost:3000")
+      )
+    }
+    
     // Use proper eBay OAuth endpoint based on environment
     const authBaseUrl = isSandbox 
       ? "https://auth.sandbox.ebay.com/oauth2/authorize"
