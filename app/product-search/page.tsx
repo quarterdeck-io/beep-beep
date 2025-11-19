@@ -56,17 +56,14 @@ export default function ProductSearchPage() {
     setLoading(true)
 
     try {
-      // This is a placeholder for the actual eBay API call
-      // You will implement this with your eBay API credentials
-      
-      setError("eBay API integration is pending. Please configure your eBay API credentials.")
-      
-      // Example of what the API call would look like:
-      // const res = await fetch(`/api/ebay/search?upc=${upc}`)
-      // const data = await res.json()
-      // if (!res.ok) throw new Error(data.error)
-      // setProductData(data)
-      
+      const res = await fetch(`/api/ebay/search?upc=${encodeURIComponent(upc)}`)
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to search product")
+      }
+
+      setProductData(data)
     } catch (err: any) {
       setError(err.message || "Failed to search product")
     } finally {
