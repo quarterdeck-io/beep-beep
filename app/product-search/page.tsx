@@ -1,9 +1,10 @@
 "use client"
 
 import Navigation from "@/components/Navigation"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import { Html5QrcodeScanner } from "html5-qrcode"
 
 interface ProductData {
   title?: string
@@ -31,6 +32,9 @@ export default function ProductSearchPage() {
   const [isConnected, setIsConnected] = useState(false)
   const [error, setError] = useState("")
   const [productData, setProductData] = useState<ProductData | null>(null)
+  const [scannerActive, setScannerActive] = useState(false)
+  const scannerRef = useRef<Html5QrcodeScanner | null>(null)
+  const scannerElementId = "html5-qrcode-scanner"
 
   useEffect(() => {
     // Check if user has connected eBay account
@@ -74,6 +78,75 @@ export default function ProductSearchPage() {
       setLoading(false)
     }
   }
+
+  const startScanner = () => {
+    if (scannerActive || scannerRef.current) {
+      return
+    }
+
+    setScannerActive(true)
+    setError("")
+
+    // Clear any existing scanner
+    const element = document.getElementById(scannerElementId)
+    if (element) {
+      element.innerHTML = ""
+    }
+
+    const scanner = new Html5QrcodeScanner(
+      scannerElementId,
+      {
+        qrbox: {
+          width: 250,
+          height: 250,
+        },
+        fps: 10,
+        supportedScanTypes: [0, 1], // Support both 1D and 2D barcodes
+      },
+      false // verbose
+    )
+
+    scannerRef.current = scanner
+
+    scanner.render(
+      (decodedText) => {
+        // Successfully scanned
+        setUpc(decodedText)
+        stopScanner()
+        // Optionally auto-search
+        // You can uncomment the next line to auto-search after scanning
+        // handleSearch(new Event('submit') as any)
+      },
+      (errorMessage) => {
+        // Error callback - ignore, scanner will keep trying
+      }
+    )
+  }
+
+  const stopScanner = () => {
+    if (scannerRef.current) {
+      scannerRef.current.clear().catch((err) => {
+        console.error("Error clearing scanner:", err)
+      })
+      scannerRef.current = null
+    }
+    setScannerActive(false)
+    
+    // Clear the scanner element
+    const element = document.getElementById(scannerElementId)
+    if (element) {
+      element.innerHTML = ""
+    }
+  }
+
+  // Cleanup scanner on unmount
+  useEffect(() => {
+    return () => {
+      if (scannerRef.current) {
+        scannerRef.current.clear().catch(() => {})
+      }
+    }
+  }, [])
 
   if (checking) {
     return (
@@ -160,6 +233,27 @@ export default function ProductSearchPage() {
                     required
                   />
                   <button
+                    type="button"
+                    onClick={scannerActive ? stopScanner : startScanner}
+                    className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors duration-200 flex items-center gap-2"
+                  >
+                    {scannerActive ? (
+                      <>
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                        Stop Scanner
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                        </svg>
+                        Scan Barcode
+                      </>
+                    )}
+                  </button>
+                  <button
                     type="submit"
                     disabled={loading}
                     className="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold rounded-lg transition-colors duration-200"
@@ -185,6 +279,31 @@ export default function ProductSearchPage() {
                       Reconnect eBay
                     </Link>
                   )}
+                </div>
+              </div>
+            )}
+
+            {/* Barcode Scanner Modal */}
+            {scannerActive && (
+              <div className="mt-4 fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+                <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                      Scan Barcode
+                    </h3>
+                    <button
+                      onClick={stopScanner}
+                      className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                    >
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                  <div id={scannerElementId} className="w-full"></div>
+                  <p className="mt-4 text-sm text-gray-600 dark:text-gray-400 text-center">
+                    Position the barcode within the frame
+                  </p>
                 </div>
               </div>
             )}
