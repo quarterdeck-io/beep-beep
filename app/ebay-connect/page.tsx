@@ -8,6 +8,7 @@ import Link from "next/link"
 function EbayConnectContent() {
   const searchParams = useSearchParams()
   const [connecting, setConnecting] = useState(false)
+  const [disconnecting, setDisconnecting] = useState(false)
   const [isConnected, setIsConnected] = useState(false)
   const [message, setMessage] = useState("")
   const [error, setError] = useState("")
@@ -53,6 +54,34 @@ function EbayConnectContent() {
     setConnecting(true)
     // Redirect to OAuth flow
     window.location.href = "/api/ebay/connect"
+  }
+
+  const handleDisconnect = async () => {
+    if (!confirm("Are you sure you want to disconnect your eBay account? You'll need to reconnect to search for products.")) {
+      return
+    }
+
+    setDisconnecting(true)
+    setError("")
+    setMessage("")
+
+    try {
+      const res = await fetch("/api/ebay/disconnect", {
+        method: "POST"
+      })
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to disconnect")
+      }
+
+      setMessage("✓ eBay account disconnected successfully")
+      setIsConnected(false)
+    } catch (err: any) {
+      setError(err.message || "Failed to disconnect eBay account")
+    } finally {
+      setDisconnecting(false)
+    }
   }
 
   return (
@@ -102,7 +131,7 @@ function EbayConnectContent() {
                     </div>
                   </div>
                 </div>
-                <div className="flex gap-3">
+                <div className="flex gap-3 flex-wrap">
                   <Link
                     href="/product-search"
                     className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors duration-200"
@@ -115,6 +144,13 @@ function EbayConnectContent() {
                   >
                     Go to Dashboard
                   </Link>
+                  <button
+                    onClick={handleDisconnect}
+                    disabled={disconnecting}
+                    className="px-6 py-3 bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white font-semibold rounded-lg transition-colors duration-200"
+                  >
+                    {disconnecting ? "Disconnecting..." : "Disconnect eBay"}
+                  </button>
                 </div>
               </div>
             ) : (
