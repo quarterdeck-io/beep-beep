@@ -67,3 +67,6 @@ Thumbs.db
 
 # Documentation (local only)
 NEXT_STEPS.md
+
+# Log files (may contain sensitive information)
+render-log.md
