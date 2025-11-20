@@ -60,6 +60,10 @@ export default function ProductSearchPage() {
       const data = await res.json()
 
       if (!res.ok) {
+        // If token refresh failed, update connection status
+        if (data.needsReconnect) {
+          setIsConnected(false)
+        }
         throw new Error(data.error || "Failed to search product")
       }
 
@@ -168,7 +172,20 @@ export default function ProductSearchPage() {
 
             {error && (
               <div className="mt-4 p-4 bg-yellow-100 dark:bg-yellow-900/30 border border-yellow-400 dark:border-yellow-700 text-yellow-700 dark:text-yellow-400 rounded">
-                {error}
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1">
+                    <p className="font-semibold mb-1">Error</p>
+                    <p>{error}</p>
+                  </div>
+                  {(error.includes("reconnect") || error.includes("connect")) && (
+                    <Link
+                      href="/ebay-connect"
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors duration-200 whitespace-nowrap shrink-0"
+                    >
+                      Reconnect eBay
+                    </Link>
+                  )}
+                </div>
               </div>
             )}
           </div>

@@ -68,8 +68,30 @@ export async function GET(req: Request) {
       })
 
       if (!refreshResponse.ok) {
+        const errorData = await refreshResponse.json().catch(() => ({}))
+        console.error("eBay token refresh failed:", {
+          status: refreshResponse.status,
+          statusText: refreshResponse.statusText,
+          error: errorData
+        })
+        
+        // If refresh token is invalid/expired, delete the token record
+        // This forces the user to reconnect, which will get fresh tokens
+        if (refreshResponse.status === 400 || refreshResponse.status === 401) {
+          try {
+            await prisma.ebayToken.delete({
+              where: { userId: session.user.id }
+            })
+          } catch (deleteError) {
+            console.error("Failed to delete invalid token:", deleteError)
+          }
+        }
+        
         return NextResponse.json(
-          { error: "Failed to refresh eBay token. Please reconnect your eBay account." },
+          { 
+            error: "Failed to refresh eBay token. Please reconnect your eBay account.",
+            needsReconnect: true
+          },
           { status: 401 }
         )
       }
