@@ -60,7 +60,6 @@ export async function POST(req: Request) {
       )
     }
 
-    console.error("Signup error:", error)
     return NextResponse.json(
       { error: "Something went wrong" },
       { status: 500 }

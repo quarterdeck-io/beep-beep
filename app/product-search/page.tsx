@@ -42,7 +42,6 @@ export default function ProductSearchPage() {
   const addDebugLog = (message: string) => {
     const timestamp = new Date().toLocaleTimeString()
     const logMessage = `[${timestamp}] ${message}`
-    console.log(logMessage)
     setDebugLogs((prev) => [...prev.slice(-9), logMessage]) // Keep last 10 logs
   }
 
@@ -112,10 +111,9 @@ export default function ProductSearchPage() {
     
     if (scannerRef.current) {
       addDebugLog("🔍 Clearing scanner instance...")
-      scannerRef.current.clear().catch((err) => {
-        addDebugLog(`❌ Error clearing scanner: ${err?.message || "Unknown error"}`)
-        console.error("Error clearing scanner:", err)
-      })
+        scannerRef.current.clear().catch((err) => {
+          addDebugLog(`❌ Error clearing scanner: ${err?.message || "Unknown error"}`)
+        })
       scannerRef.current = null
       addDebugLog("✅ Scanner instance cleared")
     }
@@ -250,7 +248,6 @@ export default function ProductSearchPage() {
                 addDebugLog("⚠️ Other scanning error")
                 setScanningStatus("Scanning...")
               }
-              console.debug("Scanner error:", errorMessage)
             } else {
               // NotFoundException is normal - no barcode in frame yet
               // Don't log every NotFoundException to avoid spam
@@ -457,7 +454,7 @@ export default function ProductSearchPage() {
 
             {/* Barcode Scanner Modal */}
             {scannerActive && (
-              <div className="mt-4 fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+              <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
                 <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white">

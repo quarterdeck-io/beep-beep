@@ -42,7 +42,6 @@ export async function GET() {
 
     return NextResponse.redirect(ebayAuthUrl.toString())
   } catch (error) {
-    console.error("eBay OAuth connect error:", error)
     return NextResponse.redirect(
       new URL("/ebay-connect?error=oauth_failed", process.env.NEXTAUTH_URL || "http://localhost:3000")
     )

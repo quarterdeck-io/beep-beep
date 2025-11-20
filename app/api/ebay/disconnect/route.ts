@@ -23,8 +23,6 @@ export async function POST() {
       message: "eBay account disconnected successfully"
     })
   } catch (error) {
-    console.error("eBay disconnect error:", error)
-    
     // If token doesn't exist, that's fine - consider it disconnected
     if (error instanceof Error && error.message.includes("Record to delete does not exist")) {
       return NextResponse.json({ 
