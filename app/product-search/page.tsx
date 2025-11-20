@@ -34,8 +34,17 @@ export default function ProductSearchPage() {
   const [productData, setProductData] = useState<ProductData | null>(null)
   const [scannerActive, setScannerActive] = useState(false)
   const [scanningStatus, setScanningStatus] = useState("")
+  const [debugLogs, setDebugLogs] = useState<string[]>([])
   const scannerRef = useRef<Html5QrcodeScanner | null>(null)
   const scannerElementId = "html5-qrcode-scanner"
+  
+  // Helper function to add debug log
+  const addDebugLog = (message: string) => {
+    const timestamp = new Date().toLocaleTimeString()
+    const logMessage = `[${timestamp}] ${message}`
+    console.log(logMessage)
+    setDebugLogs((prev) => [...prev.slice(-9), logMessage]) // Keep last 10 logs
+  }
 
   useEffect(() => {
     // Check if user has connected eBay account
@@ -81,30 +90,51 @@ export default function ProductSearchPage() {
   }
 
   const startScanner = () => {
+    addDebugLog("🔍 startScanner() called")
+    addDebugLog(`🔍 scannerActive: ${scannerActive}, scannerRef exists: ${!!scannerRef.current}`)
+    
     if (scannerActive || scannerRef.current) {
+      addDebugLog("⚠️ Scanner already active, returning early")
       return
     }
 
+    addDebugLog("🔍 Setting scanner state to active")
     setScannerActive(true)
     setError("")
     setScanningStatus("Initializing camera...")
+    setDebugLogs([]) // Clear previous logs
+    addDebugLog("✅ Scanner state updated")
   }
 
   const stopScanner = () => {
+    addDebugLog("🔍 stopScanner() called")
+    addDebugLog(`🔍 scannerRef.current exists: ${!!scannerRef.current}`)
+    
     if (scannerRef.current) {
+      addDebugLog("🔍 Clearing scanner instance...")
       scannerRef.current.clear().catch((err) => {
+        addDebugLog(`❌ Error clearing scanner: ${err?.message || "Unknown error"}`)
         console.error("Error clearing scanner:", err)
       })
       scannerRef.current = null
+      addDebugLog("✅ Scanner instance cleared")
     }
+    
+    addDebugLog("🔍 Setting scanner state to inactive")
     setScannerActive(false)
     setScanningStatus("")
     
     // Clear the scanner element
     const element = document.getElementById(scannerElementId)
     if (element) {
+      addDebugLog("🔍 Clearing scanner DOM element")
       element.innerHTML = ""
+      addDebugLog("✅ Scanner DOM element cleared")
+    } else {
+      addDebugLog("⚠️ Scanner DOM element not found for cleanup")
     }
+    
+    addDebugLog("✅ stopScanner() complete")
   }
 
   // Initialize scanner when modal is rendered
@@ -119,51 +149,80 @@ export default function ProductSearchPage() {
     }
 
     // Wait for DOM to be ready
+    addDebugLog("🔍 Setting up scanner initialization timer...")
     const timer = setTimeout(() => {
+      addDebugLog("🔍 Timer fired, looking for scanner element...")
       const element = document.getElementById(scannerElementId)
+      addDebugLog(`🔍 Element lookup result: ${!!element}`)
+      addDebugLog(`🔍 Element ID searched: ${scannerElementId}`)
+      
       if (!element) {
-        console.error("Scanner element not found")
+        addDebugLog("❌ Scanner element not found!")
+        const similarIds = Array.from(document.querySelectorAll('[id*="scanner"], [id*="qr"], [id*="barcode"]')).map(el => el.id)
+        addDebugLog(`❌ Available similar IDs: ${similarIds.join(", ") || "none"}`)
         setError("Failed to initialize scanner. Please try again.")
         setScannerActive(false)
         return
       }
 
+      addDebugLog("✅ Scanner element found, clearing content...")
       // Clear any existing content
       element.innerHTML = ""
+      addDebugLog("✅ Scanner element cleared")
 
       try {
+        addDebugLog("🔍 Starting scanner initialization...")
+        addDebugLog(`🔍 Scanner element ID: ${scannerElementId}`)
+        addDebugLog(`🔍 Scanner element found: ${!!element}`)
+        
         // Optimized configuration for barcode scanning (especially 1D barcodes like UPC)
+        const config = {
+          qrbox: {
+            width: 400,  // Wider box for 1D barcodes (UPC/EAN)
+            height: 200, // Taller than before but still optimized for horizontal barcodes
+          },
+          fps: 20, // Higher FPS for faster scanning
+          aspectRatio: 1.777778, // 16:9 aspect ratio for better camera quality
+          disableFlip: true, // Disable flip for better performance
+          supportedScanTypes: [0, 1], // Support both 1D and 2D barcodes
+          rememberLastUsedCamera: true, // Remember camera selection
+          showTorchButtonIfSupported: true, // Show torch button if available
+          showZoomSliderIfSupported: true, // Show zoom slider if available
+        }
+        
+        addDebugLog(`🔍 Scanner config: ${JSON.stringify(config)}`)
+        
         const scanner = new Html5QrcodeScanner(
           scannerElementId,
-          {
-            qrbox: {
-              width: 400,  // Wider box for 1D barcodes (UPC/EAN)
-              height: 200, // Taller than before but still optimized for horizontal barcodes
-            },
-            fps: 20, // Higher FPS for faster scanning
-            aspectRatio: 1.777778, // 16:9 aspect ratio for better camera quality
-            disableFlip: true, // Disable flip for better performance
-            supportedScanTypes: [0, 1], // Support both 1D and 2D barcodes
-            rememberLastUsedCamera: true, // Remember camera selection
-            showTorchButtonIfSupported: true, // Show torch button if available
-            showZoomSliderIfSupported: true, // Show zoom slider if available
-          },
-          false // verbose
+          config,
+          true // verbose - ENABLED FOR DEBUGGING
         )
 
+        addDebugLog(`✅ Scanner instance created: ${!!scanner}`)
         scannerRef.current = scanner
 
+        addDebugLog("🔍 Starting scanner.render()...")
         scanner.render(
           (decodedText) => {
             // Successfully scanned - validate it looks like a UPC
+            addDebugLog("✅ Barcode detected!")
+            addDebugLog(`✅ Raw decoded text: "${decodedText}"`)
+            addDebugLog(`✅ Decoded text type: ${typeof decodedText}, length: ${decodedText.length}`)
+            
             setScanningStatus("Barcode detected!")
             const cleanedText = decodedText.trim()
+            addDebugLog(`✅ Cleaned text: "${cleanedText}"`)
             
             // Basic validation: UPC codes are typically 8, 12, or 13 digits
-            if (/^\d{8,13}$/.test(cleanedText)) {
+            const isValidUPC = /^\d{8,13}$/.test(cleanedText)
+            addDebugLog(`✅ Is valid UPC format: ${isValidUPC}`)
+            
+            if (isValidUPC) {
+              addDebugLog(`✅ Setting UPC value: ${cleanedText}`)
               setUpc(cleanedText)
               // Small delay to show success message
               setTimeout(() => {
+                addDebugLog("🔍 Stopping scanner after successful scan")
                 stopScanner()
               }, 500)
               // Optionally auto-search
@@ -171,8 +230,10 @@ export default function ProductSearchPage() {
               // handleSearch(new Event('submit') as any)
             } else {
               // Not a valid UPC format, but still use it (might be EAN or other format)
+              addDebugLog(`⚠️ Not standard UPC format, but using value: ${cleanedText}`)
               setUpc(cleanedText)
               setTimeout(() => {
+                addDebugLog("🔍 Stopping scanner after scan (non-UPC format)")
                 stopScanner()
               }, 500)
             }
@@ -180,47 +241,72 @@ export default function ProductSearchPage() {
           (errorMessage) => {
             // Error callback - update status for user feedback
             if (errorMessage && !errorMessage.includes("NotFoundException")) {
+              addDebugLog(`⚠️ Scanner error: ${errorMessage}`)
               // Show scanning status
               if (errorMessage.includes("No MultiFormat Readers")) {
+                addDebugLog("⚠️ No MultiFormat Readers error")
                 setScanningStatus("Waiting for barcode...")
               } else {
+                addDebugLog("⚠️ Other scanning error")
                 setScanningStatus("Scanning...")
               }
               console.debug("Scanner error:", errorMessage)
             } else {
+              // NotFoundException is normal - no barcode in frame yet
+              // Don't log every NotFoundException to avoid spam
               setScanningStatus("Scanning...")
             }
           }
         )
         
+        addDebugLog("✅ Scanner.render() called successfully")
         // Update status after initialization
         setScanningStatus("Ready - Position barcode in frame")
+        addDebugLog("✅ Scanner initialization complete")
       } catch (err: any) {
-        console.error("Error initializing scanner:", err)
+        addDebugLog("❌ Error initializing scanner!")
+        addDebugLog(`❌ Error message: ${err?.message || "Unknown error"}`)
+        addDebugLog(`❌ Error name: ${err?.name || "Unknown"}`)
+        if (err?.stack) {
+          addDebugLog(`❌ Error stack: ${err.stack.substring(0, 200)}...`)
+        }
+        
         let errorMessage = "Failed to start camera. "
         
         if (err?.message?.includes("Permission denied") || err?.message?.includes("NotAllowedError")) {
+          addDebugLog("❌ Permission denied error")
           errorMessage += "Please allow camera access in your browser settings."
         } else if (err?.message?.includes("NotFoundError") || err?.message?.includes("No camera")) {
+          addDebugLog("❌ Camera not found error")
           errorMessage += "No camera found. Please connect a camera or use manual input."
         } else if (err?.message?.includes("NotReadableError")) {
+          addDebugLog("❌ Camera not readable error")
           errorMessage += "Camera is already in use by another application."
         } else {
+          addDebugLog("❌ Generic camera error")
           errorMessage += "Please check permissions and try again."
         }
         
+        addDebugLog(`❌ Setting error message: ${errorMessage}`)
         setError(errorMessage)
         setScannerActive(false)
         setScanningStatus("")
+        addDebugLog("❌ Error handling complete")
       }
     }, 100) // Small delay to ensure DOM is ready
 
     return () => {
+      addDebugLog("🔍 useEffect cleanup function called")
       clearTimeout(timer)
+      addDebugLog("🔍 Timer cleared")
       // Cleanup scanner if component unmounts or scannerActive changes
       if (scannerRef.current) {
-        scannerRef.current.clear().catch(() => {})
+        addDebugLog("🔍 Cleaning up scanner in useEffect cleanup")
+        scannerRef.current.clear().catch((err) => {
+          addDebugLog(`❌ Error in cleanup: ${err?.message || "Unknown"}`)
+        })
         scannerRef.current = null
+        addDebugLog("✅ Scanner cleaned up in useEffect")
       }
     }
   }, [scannerActive])
@@ -423,9 +509,38 @@ export default function ProductSearchPage() {
                     </ul>
                   </div>
                   
-                  <p className="text-sm text-gray-600 dark:text-gray-400 text-center">
+                  <p className="text-sm text-gray-600 dark:text-gray-400 text-center mb-4">
                     Position the barcode horizontally within the frame
                   </p>
+                  
+                  {/* Debug Panel */}
+                  <details className="mt-4 border border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden">
+                    <summary className="px-4 py-2 bg-gray-100 dark:bg-gray-700 cursor-pointer text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600">
+                      🔍 Debug Logs (Click to expand)
+                    </summary>
+                    <div className="p-4 bg-gray-50 dark:bg-gray-900 max-h-48 overflow-y-auto">
+                      {debugLogs.length === 0 ? (
+                        <p className="text-xs text-gray-500 dark:text-gray-400 italic">No debug logs yet...</p>
+                      ) : (
+                        <div className="space-y-1">
+                          {debugLogs.map((log, index) => (
+                            <div 
+                              key={index} 
+                              className={`text-xs font-mono p-2 rounded ${
+                                log.includes("✅") 
+                                  ? "bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-300"
+                                  : log.includes("❌") || log.includes("⚠️")
+                                  ? "bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-300"
+                                  : "bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-300"
+                              }`}
+                            >
+                              {log}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </details>
                 </div>
               </div>
             )}
