@@ -36,6 +36,8 @@ function EbayConnectContent() {
     } else if (errorParam) {
       const errorMessages: Record<string, string> = {
         missing_credentials: "eBay API credentials not configured. Please add EBAY_CLIENT_ID and EBAY_CLIENT_SECRET to your .env.local file.",
+        missing_runame: "eBay RuName (Redirect URL name) not configured. Please register your callback URL in eBay Developer Portal and add EBAY_RUNAME to your .env.local file.",
+        misconfigured: "eBay OAuth configuration is incomplete. Please check your .env.local file and ensure all required eBay credentials are set.",
         oauth_failed: "Failed to initiate OAuth flow. Please try again.",
         oauth_declined: "You declined the eBay authorization.",
         unauthorized: "Unauthorized request. Please try again.",
@@ -135,8 +137,9 @@ function EbayConnectContent() {
             <ol className="list-decimal list-inside space-y-2 text-yellow-700 dark:text-yellow-300 text-sm">
               <li>Create an eBay developer account at developer.ebay.com</li>
               <li>Create an application to get your Client ID and Client Secret</li>
-              <li>Add your credentials to the .env.local file</li>
-              <li>Implement the OAuth 2.0 flow (coming soon)</li>
+              <li>Register your callback URL in eBay Developer Portal to get your RuName (Redirect URL name)</li>
+              <li>Add your credentials (Client ID, Client Secret, and RuName) to the .env.local file</li>
+              <li>Click "Connect eBay Account" above to start the OAuth 2.0 flow</li>
             </ol>
           </div>
         </div>
