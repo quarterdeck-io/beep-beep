@@ -86,41 +86,6 @@ export default function ProductSearchPage() {
 
     setScannerActive(true)
     setError("")
-
-    // Clear any existing scanner
-    const element = document.getElementById(scannerElementId)
-    if (element) {
-      element.innerHTML = ""
-    }
-
-    const scanner = new Html5QrcodeScanner(
-      scannerElementId,
-      {
-        qrbox: {
-          width: 250,
-          height: 250,
-        },
-        fps: 10,
-        supportedScanTypes: [0, 1], // Support both 1D and 2D barcodes
-      },
-      false // verbose
-    )
-
-    scannerRef.current = scanner
-
-    scanner.render(
-      (decodedText) => {
-        // Successfully scanned
-        setUpc(decodedText)
-        stopScanner()
-        // Optionally auto-search
-        // You can uncomment the next line to auto-search after scanning
-        // handleSearch(new Event('submit') as any)
-      },
-      (errorMessage) => {
-        // Error callback - ignore, scanner will keep trying
-      }
-    )
   }
 
   const stopScanner = () => {
@@ -138,6 +103,80 @@ export default function ProductSearchPage() {
       element.innerHTML = ""
     }
   }
+
+  // Initialize scanner when modal is rendered
+  useEffect(() => {
+    if (!scannerActive) {
+      // Clean up if scanner was stopped
+      if (scannerRef.current) {
+        scannerRef.current.clear().catch(() => {})
+        scannerRef.current = null
+      }
+      return
+    }
+
+    // Wait for DOM to be ready
+    const timer = setTimeout(() => {
+      const element = document.getElementById(scannerElementId)
+      if (!element) {
+        console.error("Scanner element not found")
+        setError("Failed to initialize scanner. Please try again.")
+        setScannerActive(false)
+        return
+      }
+
+      // Clear any existing content
+      element.innerHTML = ""
+
+      try {
+        const scanner = new Html5QrcodeScanner(
+          scannerElementId,
+          {
+            qrbox: {
+              width: 250,
+              height: 250,
+            },
+            fps: 10,
+            supportedScanTypes: [0, 1], // Support both 1D and 2D barcodes
+          },
+          false // verbose
+        )
+
+        scannerRef.current = scanner
+
+        scanner.render(
+          (decodedText) => {
+            // Successfully scanned
+            setUpc(decodedText)
+            stopScanner()
+            // Optionally auto-search
+            // You can uncomment the next line to auto-search after scanning
+            // handleSearch(new Event('submit') as any)
+          },
+          (errorMessage) => {
+            // Error callback - ignore, scanner will keep trying
+            // Only log if it's a significant error
+            if (errorMessage && !errorMessage.includes("NotFoundException")) {
+              console.debug("Scanner error:", errorMessage)
+            }
+          }
+        )
+      } catch (err) {
+        console.error("Error initializing scanner:", err)
+        setError("Failed to start camera. Please check permissions and try again.")
+        setScannerActive(false)
+      }
+    }, 100) // Small delay to ensure DOM is ready
+
+    return () => {
+      clearTimeout(timer)
+      // Cleanup scanner if component unmounts or scannerActive changes
+      if (scannerRef.current) {
+        scannerRef.current.clear().catch(() => {})
+        scannerRef.current = null
+      }
+    }
+  }, [scannerActive])
 
   // Cleanup scanner on unmount
   useEffect(() => {
