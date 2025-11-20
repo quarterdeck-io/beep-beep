@@ -62,14 +62,13 @@ export default function ProductSearchPage() {
     checkEbayConnection()
   }, [])
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const performSearch = async (searchValue: string) => {
     setError("")
     setProductData(null)
     setLoading(true)
 
     try {
-      const res = await fetch(`/api/ebay/search?upc=${encodeURIComponent(upc)}`)
+      const res = await fetch(`/api/ebay/search?upc=${encodeURIComponent(searchValue)}`)
       const data = await res.json()
 
       if (!res.ok) {
@@ -86,6 +85,11 @@ export default function ProductSearchPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault()
+    await performSearch(upc)
   }
 
   const startScanner = () => {
@@ -207,7 +211,7 @@ export default function ProductSearchPage() {
             addDebugLog(`✅ Raw decoded text: "${decodedText}"`)
             addDebugLog(`✅ Decoded text type: ${typeof decodedText}, length: ${decodedText.length}`)
             
-            setScanningStatus("Barcode detected!")
+            setScanningStatus("Barcode/QR Code detected!")
             const cleanedText = decodedText.trim()
             addDebugLog(`✅ Cleaned text: "${cleanedText}"`)
             
@@ -221,18 +225,23 @@ export default function ProductSearchPage() {
               // Small delay to show success message
               setTimeout(() => {
                 addDebugLog("🔍 Stopping scanner after successful scan")
+                setScanningStatus("Searching...")
                 stopScanner()
+                // Auto-trigger search after scanning
+                addDebugLog("🔍 Auto-triggering search...")
+                performSearch(cleanedText)
               }, 500)
-              // Optionally auto-search
-              // You can uncomment the next line to auto-search after scanning
-              // handleSearch(new Event('submit') as any)
             } else {
               // Not a valid UPC format, but still use it (might be EAN or other format)
               addDebugLog(`⚠️ Not standard UPC format, but using value: ${cleanedText}`)
               setUpc(cleanedText)
               setTimeout(() => {
                 addDebugLog("🔍 Stopping scanner after scan (non-UPC format)")
+                setScanningStatus("Searching...")
                 stopScanner()
+                // Auto-trigger search after scanning
+                addDebugLog("🔍 Auto-triggering search...")
+                performSearch(cleanedText)
               }, 500)
             }
           },
