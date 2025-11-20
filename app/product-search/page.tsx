@@ -33,6 +33,7 @@ export default function ProductSearchPage() {
   const [error, setError] = useState("")
   const [productData, setProductData] = useState<ProductData | null>(null)
   const [scannerActive, setScannerActive] = useState(false)
+  const [scanningStatus, setScanningStatus] = useState("")
   const scannerRef = useRef<Html5QrcodeScanner | null>(null)
   const scannerElementId = "html5-qrcode-scanner"
 
@@ -86,6 +87,7 @@ export default function ProductSearchPage() {
 
     setScannerActive(true)
     setError("")
+    setScanningStatus("Initializing camera...")
   }
 
   const stopScanner = () => {
@@ -96,6 +98,7 @@ export default function ProductSearchPage() {
       scannerRef.current = null
     }
     setScannerActive(false)
+    setScanningStatus("")
     
     // Clear the scanner element
     const element = document.getElementById(scannerElementId)
@@ -129,15 +132,21 @@ export default function ProductSearchPage() {
       element.innerHTML = ""
 
       try {
+        // Optimized configuration for barcode scanning (especially 1D barcodes like UPC)
         const scanner = new Html5QrcodeScanner(
           scannerElementId,
           {
             qrbox: {
-              width: 250,
-              height: 250,
+              width: 400,  // Wider box for 1D barcodes (UPC/EAN)
+              height: 200, // Taller than before but still optimized for horizontal barcodes
             },
-            fps: 10,
+            fps: 20, // Higher FPS for faster scanning
+            aspectRatio: 1.777778, // 16:9 aspect ratio for better camera quality
+            disableFlip: true, // Disable flip for better performance
             supportedScanTypes: [0, 1], // Support both 1D and 2D barcodes
+            rememberLastUsedCamera: true, // Remember camera selection
+            showTorchButtonIfSupported: true, // Show torch button if available
+            showZoomSliderIfSupported: true, // Show zoom slider if available
           },
           false // verbose
         )
@@ -146,25 +155,63 @@ export default function ProductSearchPage() {
 
         scanner.render(
           (decodedText) => {
-            // Successfully scanned
-            setUpc(decodedText)
-            stopScanner()
-            // Optionally auto-search
-            // You can uncomment the next line to auto-search after scanning
-            // handleSearch(new Event('submit') as any)
+            // Successfully scanned - validate it looks like a UPC
+            setScanningStatus("Barcode detected!")
+            const cleanedText = decodedText.trim()
+            
+            // Basic validation: UPC codes are typically 8, 12, or 13 digits
+            if (/^\d{8,13}$/.test(cleanedText)) {
+              setUpc(cleanedText)
+              // Small delay to show success message
+              setTimeout(() => {
+                stopScanner()
+              }, 500)
+              // Optionally auto-search
+              // You can uncomment the next line to auto-search after scanning
+              // handleSearch(new Event('submit') as any)
+            } else {
+              // Not a valid UPC format, but still use it (might be EAN or other format)
+              setUpc(cleanedText)
+              setTimeout(() => {
+                stopScanner()
+              }, 500)
+            }
           },
           (errorMessage) => {
-            // Error callback - ignore, scanner will keep trying
-            // Only log if it's a significant error
+            // Error callback - update status for user feedback
             if (errorMessage && !errorMessage.includes("NotFoundException")) {
+              // Show scanning status
+              if (errorMessage.includes("No MultiFormat Readers")) {
+                setScanningStatus("Waiting for barcode...")
+              } else {
+                setScanningStatus("Scanning...")
+              }
               console.debug("Scanner error:", errorMessage)
+            } else {
+              setScanningStatus("Scanning...")
             }
           }
         )
-      } catch (err) {
+        
+        // Update status after initialization
+        setScanningStatus("Ready - Position barcode in frame")
+      } catch (err: any) {
         console.error("Error initializing scanner:", err)
-        setError("Failed to start camera. Please check permissions and try again.")
+        let errorMessage = "Failed to start camera. "
+        
+        if (err?.message?.includes("Permission denied") || err?.message?.includes("NotAllowedError")) {
+          errorMessage += "Please allow camera access in your browser settings."
+        } else if (err?.message?.includes("NotFoundError") || err?.message?.includes("No camera")) {
+          errorMessage += "No camera found. Please connect a camera or use manual input."
+        } else if (err?.message?.includes("NotReadableError")) {
+          errorMessage += "Camera is already in use by another application."
+        } else {
+          errorMessage += "Please check permissions and try again."
+        }
+        
+        setError(errorMessage)
         setScannerActive(false)
+        setScanningStatus("")
       }
     }, 100) // Small delay to ensure DOM is ready
 
@@ -325,23 +372,59 @@ export default function ProductSearchPage() {
             {/* Barcode Scanner Modal */}
             {scannerActive && (
               <div className="mt-4 fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-                <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full">
+                <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                       Scan Barcode
                     </h3>
                     <button
                       onClick={stopScanner}
-                      className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                      className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+                      aria-label="Close scanner"
                     >
                       <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                       </svg>
                     </button>
                   </div>
-                  <div id={scannerElementId} className="w-full"></div>
-                  <p className="mt-4 text-sm text-gray-600 dark:text-gray-400 text-center">
-                    Position the barcode within the frame
+                  
+                  {/* Scanner Container */}
+                  <div id={scannerElementId} className="w-full mb-4 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-900"></div>
+                  
+                  {/* Scanning Status */}
+                  {scanningStatus && (
+                    <div className="mb-4 text-center">
+                      <p className={`text-sm font-medium ${
+                        scanningStatus.includes("detected") 
+                          ? "text-green-600 dark:text-green-400" 
+                          : scanningStatus.includes("Initializing")
+                          ? "text-blue-600 dark:text-blue-400"
+                          : "text-gray-600 dark:text-gray-400"
+                      }`}>
+                        {scanningStatus}
+                      </p>
+                    </div>
+                  )}
+                  
+                  {/* Scanning Tips */}
+                  <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-4">
+                    <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-300 mb-2 flex items-center gap-2">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      Tips for Better Scanning
+                    </h4>
+                    <ul className="text-xs text-blue-800 dark:text-blue-300 space-y-1 list-disc list-inside">
+                      <li>Hold the barcode steady and parallel to the screen</li>
+                      <li>Ensure good lighting (avoid glare and shadows)</li>
+                      <li>Keep the barcode within the scanning frame</li>
+                      <li>Hold the device 4-6 inches away from the barcode</li>
+                      <li>Make sure the barcode is clear and not damaged</li>
+                    </ul>
+                  </div>
+                  
+                  <p className="text-sm text-gray-600 dark:text-gray-400 text-center">
+                    Position the barcode horizontally within the frame
                   </p>
                 </div>
               </div>
