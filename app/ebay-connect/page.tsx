@@ -147,7 +147,7 @@ function EbayConnectContent() {
                   <button
                     onClick={handleDisconnect}
                     disabled={disconnecting}
-                    className="px-6 py-3 bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white font-semibold rounded-lg transition-colors duration-200"
+                    className="px-6 py-3 bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white font-semibold rounded-lg transition-colors duration-200 cursor-pointer"
                   >
                     {disconnecting ? "Disconnecting..." : "Disconnect eBay"}
                   </button>
