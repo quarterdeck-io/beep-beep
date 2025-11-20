@@ -21,7 +21,6 @@ export async function GET() {
       expiresAt: ebayToken?.expiresAt 
     })
   } catch (error) {
-    console.error("Check connection error:", error)
     return NextResponse.json({ connected: false }, { status: 200 })
   }
 }

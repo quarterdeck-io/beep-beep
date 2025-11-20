@@ -21,7 +21,7 @@ function EbayConnectContent() {
         const data = await res.json()
         setIsConnected(data.connected)
       } catch (err) {
-        console.error("Failed to check connection:", err)
+        // Connection check failed
       }
     }
 

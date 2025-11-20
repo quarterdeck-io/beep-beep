@@ -69,11 +69,6 @@ export async function GET(req: Request) {
 
       if (!refreshResponse.ok) {
         const errorData = await refreshResponse.json().catch(() => ({}))
-        console.error("eBay token refresh failed:", {
-          status: refreshResponse.status,
-          statusText: refreshResponse.statusText,
-          error: errorData
-        })
         
         // If refresh token is invalid/expired, delete the token record
         // This forces the user to reconnect, which will get fresh tokens
@@ -83,7 +78,7 @@ export async function GET(req: Request) {
               where: { userId: session.user.id }
             })
           } catch (deleteError) {
-            console.error("Failed to delete invalid token:", deleteError)
+            // Failed to delete invalid token
           }
         }
         
@@ -129,7 +124,6 @@ export async function GET(req: Request) {
     
     if (!ebayResponse.ok) {
       const errorData = await ebayResponse.json().catch(() => ({}))
-      console.error("eBay API error:", errorData)
       
       return NextResponse.json(
         { 
@@ -154,7 +148,6 @@ export async function GET(req: Request) {
 
     return NextResponse.json(product)
   } catch (error) {
-    console.error("eBay search error:", error)
     return NextResponse.json(
       { error: "Something went wrong", details: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 }

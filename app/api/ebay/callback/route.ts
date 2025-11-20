@@ -11,7 +11,6 @@ export async function GET(req: Request) {
 
     // Check for OAuth errors
     if (error) {
-      console.error("eBay OAuth error:", error)
       return NextResponse.redirect(
         new URL("/ebay-connect?error=oauth_declined", process.env.NEXTAUTH_URL || "http://localhost:3000")
       )
@@ -40,7 +39,6 @@ export async function GET(req: Request) {
     const ruName = process.env.EBAY_RUNAME || process.env.EBAY_REDIRECT_URI
     
     if (!ruName) {
-      console.error("EBAY_RUNAME or EBAY_REDIRECT_URI is not configured")
       return NextResponse.redirect(
         new URL("/ebay-connect?error=misconfigured", process.env.NEXTAUTH_URL || "http://localhost:3000")
       )
@@ -63,7 +61,6 @@ export async function GET(req: Request) {
 
     if (!tokenResponse.ok) {
       const errorData = await tokenResponse.json()
-      console.error("Token exchange failed:", errorData)
       return NextResponse.redirect(
         new URL("/ebay-connect?error=token_exchange_failed", process.env.NEXTAUTH_URL || "http://localhost:3000")
       )
@@ -91,7 +88,6 @@ export async function GET(req: Request) {
       new URL("/ebay-connect?success=true", process.env.NEXTAUTH_URL || "http://localhost:3000")
     )
   } catch (error) {
-    console.error("eBay callback error:", error)
     return NextResponse.redirect(
       new URL("/ebay-connect?error=callback_failed", process.env.NEXTAUTH_URL || "http://localhost:3000")
     )
