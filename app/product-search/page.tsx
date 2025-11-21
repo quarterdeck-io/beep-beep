@@ -483,7 +483,7 @@ export default function ProductSearchPage() {
             {/* Barcode Scanner Modal */}
             {scannerActive && (
               <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-                <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto">
+                <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-lg w-full max-h-[70vh] overflow-y-auto">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                       Scan Barcode
@@ -500,13 +500,15 @@ export default function ProductSearchPage() {
                   </div>
                   
                   {/* Scanner Container */}
-                  <div id={scannerElementId} className="w-full mb-4 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-900 max-h-[400px]"></div>
+                  <div id={scannerElementId} className="w-full mb-4 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-900 max-h-[250px]"></div>
                   
                   {/* Scanning Status */}
                   {scanningStatus && (
                     <div className="mb-4 text-center">
                       <p className={`text-sm font-medium ${
-                        scanningStatus.includes("detected") 
+                        scanningStatus.includes("Error") || scanningStatus.includes("error")
+                          ? "text-red-600 dark:text-red-400"
+                          : scanningStatus.includes("detected") && !scanningStatus.includes("Error")
                           ? "text-green-600 dark:text-green-400" 
                           : scanningStatus.includes("Initializing")
                           ? "text-blue-600 dark:text-blue-400"
