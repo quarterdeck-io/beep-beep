@@ -39,6 +39,26 @@ export default function ProductSearchPage() {
   const scannerElementId = "html5-qrcode-scanner"
   const errorCooldownRef = useRef<NodeJS.Timeout | null>(null)
   
+  // Editable fields state
+  const [isEditing, setIsEditing] = useState(false)
+  const [editedTitle, setEditedTitle] = useState("")
+  const [editedDescription, setEditedDescription] = useState("")
+  const [editedCondition, setEditedCondition] = useState("")
+  
+  // Available conditions for dropdown
+  const conditions = [
+    "Brand New",
+    "New Other",
+    "New with Defects",
+    "Manufacturer Refurbished",
+    "Seller Refurbished",
+    "Used - Excellent",
+    "Used - Very Good",
+    "Used - Good",
+    "Used - Acceptable",
+    "For Parts or Not Working"
+  ]
+  
   // Helper function to add debug log
   const addDebugLog = (message: string) => {
     const timestamp = new Date().toLocaleTimeString()
@@ -81,11 +101,40 @@ export default function ProductSearchPage() {
       }
 
       setProductData(data)
+      // Initialize editable fields with product data
+      setEditedTitle(data.title || "")
+      setEditedDescription(data.shortDescription || data.description || "")
+      setEditedCondition(data.condition || "Brand New")
+      setIsEditing(false)
     } catch (err: any) {
       setError(err.message || "Failed to search product")
     } finally {
       setLoading(false)
     }
+  }
+  
+  const handleSaveEdit = () => {
+    if (!productData) return
+    
+    // Update product data with edited values
+    setProductData({
+      ...productData,
+      title: editedTitle,
+      description: editedDescription,
+      shortDescription: editedDescription,
+      condition: editedCondition
+    })
+    setIsEditing(false)
+  }
+  
+  const handleCancelEdit = () => {
+    // Reset to original values
+    if (productData) {
+      setEditedTitle(productData.title || "")
+      setEditedDescription(productData.shortDescription || productData.description || "")
+      setEditedCondition(productData.condition || "Brand New")
+    }
+    setIsEditing(false)
   }
 
   const handleSearch = async (e: React.FormEvent) => {
@@ -565,17 +614,80 @@ export default function ProductSearchPage() {
 
                   {/* Product Details */}
                   <div className="space-y-4">
-                    {productData.title && (
-                      <div>
-                        <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                          Title
-                        </h3>
-                        <p className="mt-1 text-lg text-gray-900 dark:text-white">
-                          {productData.title}
-                        </p>
-                      </div>
-                    )}
+                    {/* Edit/Save buttons */}
+                    <div className="flex justify-end gap-2 mb-4">
+                      {!isEditing ? (
+                        <button
+                          onClick={() => setIsEditing(true)}
+                          className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors duration-200 flex items-center gap-2"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                          Edit
+                        </button>
+                      ) : (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={handleSaveEdit}
+                            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors duration-200 flex items-center gap-2"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                            Save
+                          </button>
+                          <button
+                            onClick={handleCancelEdit}
+                            className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors duration-200"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      )}
+                    </div>
 
+                    {/* Title - Editable */}
+                    <div>
+                      <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">
+                        Title
+                      </h3>
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={editedTitle}
+                          onChange={(e) => setEditedTitle(e.target.value)}
+                          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-lg"
+                          placeholder="Enter product title"
+                        />
+                      ) : (
+                        <p className="mt-1 text-lg text-gray-900 dark:text-white">
+                          {productData.title || "No title"}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Description - Editable */}
+                    <div>
+                      <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">
+                        Description
+                      </h3>
+                      {isEditing ? (
+                        <textarea
+                          value={editedDescription}
+                          onChange={(e) => setEditedDescription(e.target.value)}
+                          rows={4}
+                          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                          placeholder="Enter product description"
+                        />
+                      ) : (
+                        <p className="mt-1 text-gray-900 dark:text-white whitespace-pre-wrap">
+                          {productData.shortDescription || productData.description || "No description"}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Price - Read Only */}
                     {productData.price && (
                       <div>
                         <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">
@@ -587,17 +699,31 @@ export default function ProductSearchPage() {
                       </div>
                     )}
 
-                    {productData.condition && (
-                      <div>
-                        <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                          Condition
-                        </h3>
+                    {/* Condition - Editable */}
+                    <div>
+                      <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">
+                        Condition
+                      </h3>
+                      {isEditing ? (
+                        <select
+                          value={editedCondition}
+                          onChange={(e) => setEditedCondition(e.target.value)}
+                          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        >
+                          {conditions.map((condition) => (
+                            <option key={condition} value={condition}>
+                              {condition}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
                         <p className="mt-1 text-gray-900 dark:text-white">
-                          {productData.condition}
+                          {productData.condition || "Not specified"}
                         </p>
-                      </div>
-                    )}
+                      )}
+                    </div>
 
+                    {/* Seller - Read Only */}
                     {productData.seller && (
                       <div>
                         <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">
@@ -614,6 +740,7 @@ export default function ProductSearchPage() {
                       </div>
                     )}
 
+                    {/* View on eBay Button */}
                     {productData.itemWebUrl && (
                       <div>
                         <a
