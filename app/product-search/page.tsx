@@ -37,6 +37,7 @@ export default function ProductSearchPage() {
   const [debugLogs, setDebugLogs] = useState<string[]>([])
   const scannerRef = useRef<Html5QrcodeScanner | null>(null)
   const scannerElementId = "html5-qrcode-scanner"
+  const errorCooldownRef = useRef<NodeJS.Timeout | null>(null)
   
   // Helper function to add debug log
   const addDebugLog = (message: string) => {
@@ -113,6 +114,12 @@ export default function ProductSearchPage() {
     addDebugLog("🔍 stopScanner() called")
     addDebugLog(`🔍 scannerRef.current exists: ${!!scannerRef.current}`)
     
+    // Clear error cooldown timeout if exists
+    if (errorCooldownRef.current) {
+      clearTimeout(errorCooldownRef.current)
+      errorCooldownRef.current = null
+    }
+    
     if (scannerRef.current) {
       addDebugLog("🔍 Clearing scanner instance...")
         scannerRef.current.clear().catch((err) => {
@@ -181,7 +188,7 @@ export default function ProductSearchPage() {
         const config = {
           qrbox: {
             width: 400,  // Wider box for 1D barcodes (UPC/EAN)
-            height: 200, // Taller than before but still optimized for horizontal barcodes
+            height: 120, // Reduced height for more compact scan area
           },
           fps: 20, // Higher FPS for faster scanning
           aspectRatio: 1.777778, // 16:9 aspect ratio for better camera quality
@@ -248,15 +255,27 @@ export default function ProductSearchPage() {
           (errorMessage) => {
             // Error callback - update status for user feedback
             if (errorMessage && !errorMessage.includes("NotFoundException")) {
-              addDebugLog(`⚠️ Scanner error: ${errorMessage}`)
-              // Show scanning status
-              if (errorMessage.includes("No MultiFormat Readers")) {
-                addDebugLog("⚠️ No MultiFormat Readers error")
-                setScanningStatus("Waiting for barcode...")
-              } else {
-                addDebugLog("⚠️ Other scanning error")
-                setScanningStatus("Scanning...")
+              // Clear any existing cooldown
+              if (errorCooldownRef.current) {
+                clearTimeout(errorCooldownRef.current)
               }
+              
+              addDebugLog(`⚠️ Scanner error: ${errorMessage}`)
+              setScanningStatus("Error detected - pausing...")
+              
+              // Add setTimeout to pause scanning after error before continuing
+              errorCooldownRef.current = setTimeout(() => {
+                addDebugLog("✅ Resuming scan after error cooldown")
+                // Show scanning status
+                if (errorMessage.includes("No MultiFormat Readers")) {
+                  addDebugLog("⚠️ No MultiFormat Readers error")
+                  setScanningStatus("Waiting for barcode...")
+                } else {
+                  addDebugLog("⚠️ Other scanning error")
+                  setScanningStatus("Scanning...")
+                }
+                errorCooldownRef.current = null
+              }, 1000) // Wait 1 second before resuming after error
             } else {
               // NotFoundException is normal - no barcode in frame yet
               // Don't log every NotFoundException to avoid spam
@@ -481,7 +500,7 @@ export default function ProductSearchPage() {
                   </div>
                   
                   {/* Scanner Container */}
-                  <div id={scannerElementId} className="w-full mb-4 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-900"></div>
+                  <div id={scannerElementId} className="w-full mb-4 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-900 max-h-[400px]"></div>
                   
                   {/* Scanning Status */}
                   {scanningStatus && (
