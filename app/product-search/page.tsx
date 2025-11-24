@@ -180,7 +180,20 @@ export default function ProductSearchPage() {
       const data = await response.json()
       
       if (!response.ok) {
-        throw new Error(data.error || "Failed to list product on eBay")
+        // Build a more detailed error message
+        let errorMessage = data.error || "Failed to list product on eBay"
+        if (data.details?.errors?.[0]?.message) {
+          errorMessage += `: ${data.details.errors[0].message}`
+        } else if (data.details?.errors?.[0]?.longMessage) {
+          errorMessage += `: ${data.details.errors[0].longMessage}`
+        }
+        if (data.hint) {
+          errorMessage += ` (${data.hint})`
+        }
+        if (data.details) {
+          console.error("eBay API Error Details:", data.details)
+        }
+        throw new Error(errorMessage)
       }
       
       setListingSuccess(data.listingUrl || data.message || "Product listed successfully!")
@@ -880,7 +893,7 @@ export default function ProductSearchPage() {
                     {listingError && (
                       <div className="mt-4 p-4 bg-red-100 dark:bg-red-900/30 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-400 rounded-lg">
                         <div className="flex items-start gap-2">
-                          <svg className="w-5 h-5 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className="w-5 h-5 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                           </svg>
                           <div>
