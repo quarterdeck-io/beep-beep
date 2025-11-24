@@ -14,13 +14,59 @@ export async function POST(req: Request) {
       )
     }
 
-    const body = await req.json()
-    const { title, description, price, condition, imageUrl, categoryId } = body
-
-    // Validate required fields
-    if (!title || !description || !price || !condition) {
+    let body
+    try {
+      body = await req.json()
+    } catch (parseError) {
       return NextResponse.json(
-        { error: "Missing required fields: title, description, price, and condition are required" },
+        { error: "Invalid request body. Could not parse JSON." },
+        { status: 400 }
+      )
+    }
+
+    let { title, description, price, condition, imageUrl, categoryId } = body
+
+    // Validate and sanitize required fields
+    const missingFields: string[] = []
+    
+    // Title validation
+    if (!title || (typeof title === 'string' && title.trim().length === 0)) {
+      missingFields.push("title")
+    } else {
+      title = title.trim()
+    }
+    
+    // Description - provide default if empty
+    if (!description || (typeof description === 'string' && description.trim().length === 0)) {
+      description = "No description provided." // Provide a default description
+    } else {
+      description = description.trim()
+    }
+    
+    // Price validation
+    const priceNum = parseFloat(price)
+    if (!price || isNaN(priceNum) || priceNum <= 0) {
+      missingFields.push("price (must be a valid number greater than 0)")
+    }
+    
+    // Condition validation
+    if (!condition || (typeof condition === 'string' && condition.trim().length === 0)) {
+      missingFields.push("condition")
+    } else {
+      condition = condition.trim()
+    }
+
+    if (missingFields.length > 0) {
+      return NextResponse.json(
+        { 
+          error: `Missing or invalid required fields: ${missingFields.join(", ")}`,
+          received: { 
+            title: title || null, 
+            description: description || null, 
+            price, 
+            condition: condition || null 
+          }
+        },
         { status: 400 }
       )
     }
@@ -97,15 +143,29 @@ export async function POST(req: Request) {
       ? "https://api.sandbox.ebay.com"
       : "https://api.ebay.com"
 
+    // Generate a unique SKU for this listing
+    const sku = `SKU-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
+
     // Step 1: Create an inventory item
-    const inventoryItemPayload = {
+    // eBay requires SKU to be provided upfront
+    // Note: eBay Inventory API may require product identifiers (EAN, UPC, ISBN) 
+    // or you may need to use the Catalog API first to get product details
+    const inventoryItemPayload: any = {
+      sku: sku,
       product: {
         title: title.substring(0, 80), // eBay title limit is 80 characters
-        description: description,
-        imageUrls: imageUrl ? [imageUrl] : [],
-        aspects: {},
       },
       condition: mapConditionToEbay(condition),
+    }
+    
+    // Add description if provided (some categories require it)
+    if (description && description.trim().length > 0) {
+      inventoryItemPayload.product.description = description.substring(0, 50000)
+    }
+    
+    // Add images if provided
+    if (imageUrl && imageUrl.trim().length > 0) {
+      inventoryItemPayload.product.imageUrls = [imageUrl]
     }
 
     const inventoryResponse = await fetch(
@@ -123,17 +183,20 @@ export async function POST(req: Request) {
 
     if (!inventoryResponse.ok) {
       const errorData = await inventoryResponse.json().catch(() => ({}))
+      const errorMessage = errorData.errors?.[0]?.message || errorData.errors?.[0]?.longMessage || "Failed to create inventory item"
       return NextResponse.json(
         { 
-          error: errorData.errors?.[0]?.message || "Failed to create inventory item",
-          details: errorData
+          error: errorMessage,
+          details: errorData,
+          hint: "Make sure your eBay account has selling privileges and the required permissions."
         },
         { status: inventoryResponse.status }
       )
     }
 
     const inventoryData = await inventoryResponse.json()
-    const sku = inventoryData.sku || `SKU-${Date.now()}`
+    // Use the SKU we provided, or fall back to the one from response
+    const finalSku = inventoryData.sku || sku
 
     // Step 2: Try to get user's policies (optional - eBay may use defaults)
     let fulfillmentPolicyId = "default"
@@ -165,17 +228,17 @@ export async function POST(req: Request) {
 
     // Step 3: Create an offer
     const offerPayload: any = {
-      sku: sku,
+      sku: finalSku,
       marketplaceId: "EBAY_US",
       format: "FIXED_PRICE",
-      listingDescription: description,
+      listingDescription: description.substring(0, 50000), // eBay description limit
       pricingSummary: {
         price: {
           value: parseFloat(price).toFixed(2),
           currency: "USD",
         },
       },
-      categoryId: categoryId || "267",
+      categoryId: categoryId || "267", // Default category - Books/Movies/Music
       quantity: 1,
     }
 
@@ -206,7 +269,7 @@ export async function POST(req: Request) {
       
       // If offer creation fails, try to clean up the inventory item
       try {
-        await fetch(`${baseUrl}/sell/inventory/v1/inventory_item/${sku}`, {
+        await fetch(`${baseUrl}/sell/inventory/v1/inventory_item/${finalSku}`, {
           method: "DELETE",
           headers: {
             'Authorization': `Bearer ${accessToken}`,
@@ -217,11 +280,23 @@ export async function POST(req: Request) {
         // Ignore cleanup errors
       }
 
+      const errorMessage = errorData.errors?.[0]?.message || errorData.errors?.[0]?.longMessage || "Failed to create offer"
+      let hint = "You may need to set up fulfillment, payment, and return policies in your eBay account first."
+      
+      // Provide more specific hints based on error
+      if (errorMessage.includes("policy") || errorMessage.includes("Policy")) {
+        hint = "Please set up fulfillment, payment, and return policies in your eBay Seller Hub first."
+      } else if (errorMessage.includes("category") || errorMessage.includes("Category")) {
+        hint = "The category ID might be invalid. Please check the product category."
+      } else if (errorMessage.includes("SKU") || errorMessage.includes("sku")) {
+        hint = "There was an issue with the product SKU. Please try again."
+      }
+
       return NextResponse.json(
         { 
-          error: errorData.errors?.[0]?.message || "Failed to create offer",
+          error: errorMessage,
           details: errorData,
-          hint: "You may need to set up fulfillment, payment, and return policies in your eBay account first."
+          hint: hint
         },
         { status: offerResponse.status }
       )
@@ -229,6 +304,16 @@ export async function POST(req: Request) {
 
     const offerData = await offerResponse.json()
     const offerId = offerData.offerId
+
+    if (!offerId) {
+      return NextResponse.json(
+        { 
+          error: "Offer created but no offer ID returned",
+          details: offerData,
+        },
+        { status: 500 }
+      )
+    }
 
     // Step 4: Publish the offer
     const publishResponse = await fetch(
@@ -245,12 +330,13 @@ export async function POST(req: Request) {
 
     if (!publishResponse.ok) {
       const errorData = await publishResponse.json().catch(() => ({}))
+      const errorMessage = errorData.errors?.[0]?.message || errorData.errors?.[0]?.longMessage || "Failed to publish listing"
       return NextResponse.json(
         { 
-          error: errorData.errors?.[0]?.message || "Failed to publish listing",
+          error: errorMessage,
           details: errorData,
           offerId: offerId,
-          hint: "Offer created but not published. You can publish it manually from your eBay account."
+          hint: "Offer created but not published. You can publish it manually from your eBay Seller Hub."
         },
         { status: publishResponse.status }
       )
@@ -263,14 +349,16 @@ export async function POST(req: Request) {
       message: "Product listed successfully on eBay",
       listingId: publishData.listingId,
       offerId: offerId,
-      sku: sku,
+      sku: finalSku,
       listingUrl: `https://www.ebay.com/itm/${publishData.listingId}`,
     })
   } catch (error) {
+    console.error("Error in eBay list endpoint:", error)
     return NextResponse.json(
       { 
         error: "Something went wrong", 
-        details: error instanceof Error ? error.message : "Unknown error" 
+        details: error instanceof Error ? error.message : "Unknown error",
+        stack: error instanceof Error ? error.stack : undefined
       },
       { status: 500 }
     )
