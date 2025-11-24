@@ -63,7 +63,8 @@ export async function GET(req: Request) {
     })
 
     if (!tokenResponse.ok) {
-      const errorData = await tokenResponse.json()
+      const errorData = await tokenResponse.json().catch(() => ({}))
+      console.error("eBay token exchange failed:", errorData)
       return NextResponse.redirect(
         new URL("/ebay-connect?error=token_exchange_failed", process.env.NEXTAUTH_URL || "http://localhost:3000")
       )
