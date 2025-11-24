@@ -228,7 +228,7 @@ export default function ProductSearchPage() {
       setListingLoading(false)
     }
   }
-  
+
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault()
     await performSearch(upc)
@@ -927,7 +927,6 @@ export default function ProductSearchPage() {
                         </div>
                       </div>
                     )}
-                    
                   </div>
                 </div>
 
