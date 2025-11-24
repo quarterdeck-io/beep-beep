@@ -20,13 +20,36 @@ export async function GET() {
     // eBay uses RuName (Redirect URL name) - a registered identifier instead of actual URL
     const isSandbox = process.env.EBAY_SANDBOX === "true"
     const ruName = process.env.EBAY_RUNAME || process.env.EBAY_REDIRECT_URI
+    
+    // Get and validate scopes - MUST include sell.inventory scopes for listing
     const scope = process.env.EBAY_SCOPE || "https://api.ebay.com/oauth/api_scope"
+    
+    // Validate that required scopes are present
+    const requiredScopes = [
+      "sell.inventory",
+      "sell.inventory.readonly"
+    ]
+    
+    const scopeArray = scope.split(" ").filter(s => s.trim())
+    const hasRequiredScopes = requiredScopes.every(required => 
+      scopeArray.some(s => s.includes(required))
+    )
+    
+    if (!hasRequiredScopes) {
+      console.error("Missing required eBay scopes. Current scopes:", scope)
+      return NextResponse.redirect(
+        new URL("/ebay-connect?error=missing_scopes", process.env.NEXTAUTH_URL || "http://localhost:3000")
+      )
+    }
     
     if (!ruName) {
       return NextResponse.redirect(
         new URL("/ebay-connect?error=missing_runame", process.env.NEXTAUTH_URL || "http://localhost:3000")
       )
     }
+    
+    // Log scopes being used (for debugging)
+    console.log("eBay OAuth scopes being requested:", scope)
     
     // Use proper eBay OAuth endpoint based on environment
     const authBaseUrl = isSandbox 
