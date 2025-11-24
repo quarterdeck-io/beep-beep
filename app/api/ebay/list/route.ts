@@ -148,8 +148,7 @@ export async function POST(req: Request) {
 
     // Step 1: Create an inventory item
     // eBay requires SKU to be provided upfront
-    // Note: eBay Inventory API may require product identifiers (EAN, UPC, ISBN) 
-    // or you may need to use the Catalog API first to get product details
+    // Note: eBay Inventory API structure - we'll use a minimal required structure
     const inventoryItemPayload: any = {
       sku: sku,
       product: {
@@ -159,14 +158,18 @@ export async function POST(req: Request) {
     }
     
     // Add description if provided (some categories require it)
+    // Note: Description should be in the product object for inventory items
     if (description && description.trim().length > 0) {
       inventoryItemPayload.product.description = description.substring(0, 50000)
     }
     
-    // Add images if provided
+    // Add images if provided - eBay expects imageUrls array
     if (imageUrl && imageUrl.trim().length > 0) {
       inventoryItemPayload.product.imageUrls = [imageUrl]
     }
+    
+    // Log the payload for debugging
+    console.log("Creating inventory item with payload:", JSON.stringify(inventoryItemPayload, null, 2))
 
     const inventoryResponse = await fetch(
       `${baseUrl}/sell/inventory/v1/inventory_item`,
@@ -183,12 +186,26 @@ export async function POST(req: Request) {
 
     if (!inventoryResponse.ok) {
       const errorData = await inventoryResponse.json().catch(() => ({}))
-      const errorMessage = errorData.errors?.[0]?.message || errorData.errors?.[0]?.longMessage || "Failed to create inventory item"
+      const errorText = await inventoryResponse.text().catch(() => "")
+      
+      // Log full error for debugging
+      console.error("eBay Inventory API Error:", {
+        status: inventoryResponse.status,
+        statusText: inventoryResponse.statusText,
+        errorData,
+        errorText,
+        payload: inventoryItemPayload
+      })
+      
+      const errorMessage = errorData.errors?.[0]?.message || errorData.errors?.[0]?.longMessage || errorData.message || "Failed to create inventory item"
+      const errorCode = errorData.errors?.[0]?.errorId || errorData.errors?.[0]?.code
+      
       return NextResponse.json(
         { 
           error: errorMessage,
+          errorCode: errorCode,
           details: errorData,
-          hint: "Make sure your eBay account has selling privileges and the required permissions."
+          hint: errorData.errors?.[0]?.longMessage || "Make sure your eBay account has selling privileges and the required permissions. You may need to set up your seller account first."
         },
         { status: inventoryResponse.status }
       )
@@ -227,6 +244,14 @@ export async function POST(req: Request) {
     }
 
     // Step 3: Create an offer
+    // Use a valid category ID - 267 is Movies & TV, but let's try to get a better one
+    // If no categoryId provided, use a common default based on product type
+    let finalCategoryId = categoryId
+    if (!finalCategoryId || finalCategoryId === "") {
+      // Default to Movies & TV category (267) - common for DVDs/Blu-rays
+      finalCategoryId = "267"
+    }
+    
     const offerPayload: any = {
       sku: finalSku,
       marketplaceId: "EBAY_US",
@@ -238,9 +263,11 @@ export async function POST(req: Request) {
           currency: "USD",
         },
       },
-      categoryId: categoryId || "267", // Default category - Books/Movies/Music
+      categoryId: finalCategoryId,
       quantity: 1,
     }
+    
+    console.log("Creating offer with payload:", JSON.stringify(offerPayload, null, 2))
 
     // Add listing policies if we have them
     if (fulfillmentPolicyId !== "default" || paymentPolicyId !== "default" || returnPolicyId !== "default") {
