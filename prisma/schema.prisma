@@ -21,6 +21,7 @@ model User {
   accounts      Account[]
   sessions      Session[]
   ebayTokens    EbayToken[]
+  draftListings DraftListing[]
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 }
@@ -76,4 +77,23 @@ model EbayToken {
   updatedAt    DateTime @updatedAt
 
   @@unique([userId])
+}
+
+// Draft Listings Model
+model DraftListing {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  description String   @db.Text
+  price       String
+  condition   String
+  imageUrl    String?  @db.Text
+  categoryId  String?
+  upc         String?  // Store UPC for reference
+  productData Json?    // Store full product data as JSON
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
 }
