@@ -149,7 +149,7 @@ function EbayConnectContent() {
                     disabled={disconnecting}
                     className="px-6 py-3 bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white font-semibold rounded-lg transition-colors duration-200 cursor-pointer"
                   >
-                    {disconnecting ? "Disconnecting..." : "Disconnect eBay"}
+                    {disconnecting ? "Disconnecting..." : "Disconnect & Revoke Access"}
                   </button>
                 </div>
               </div>
@@ -166,7 +166,7 @@ function EbayConnectContent() {
             )}
           </div>
 
-          <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-6">
+          <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-6 mb-6">
             <h3 className="text-lg font-semibold text-yellow-800 dark:text-yellow-400 mb-2">
               Setup Instructions
             </h3>
@@ -178,6 +178,27 @@ function EbayConnectContent() {
               <li>Click "Connect eBay Account" above to start the OAuth 2.0 flow</li>
             </ol>
           </div>
+
+          {isConnected && (
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
+              <h3 className="text-lg font-semibold text-blue-800 dark:text-blue-400 mb-2">
+                Need to Re-authorize?
+              </h3>
+              <p className="text-sm text-blue-700 dark:text-blue-300 mb-3">
+                If you want to see the permission screen again when reconnecting, you can:
+              </p>
+              <ol className="list-decimal list-inside space-y-2 text-blue-700 dark:text-blue-300 text-sm">
+                <li>Click "Disconnect & Revoke Access" above (this revokes the authorization on eBay's side)</li>
+                <li>Or manually revoke access in your eBay account settings:
+                  <ul className="list-disc list-inside ml-4 mt-1">
+                    <li>Go to <a href="https://www.ebay.com/mys/home?source=MYE_LEFTNAV" target="_blank" rel="noopener noreferrer" className="underline">My eBay</a></li>
+                    <li>Navigate to Account → Site Preferences → Authorized Applications</li>
+                    <li>Find this app and click "Revoke Access"</li>
+                  </ul>
+                </li>
+              </ol>
+            </div>
+          )}
         </div>
       </div>
     </div>
