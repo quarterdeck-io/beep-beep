@@ -14,13 +14,59 @@ export async function POST(req: Request) {
       )
     }
 
-    const body = await req.json()
-    const { title, description, price, condition, imageUrl, categoryId } = body
-
-    // Validate required fields
-    if (!title || !description || !price || !condition) {
+    let body
+    try {
+      body = await req.json()
+    } catch (parseError) {
       return NextResponse.json(
-        { error: "Missing required fields: title, description, price, and condition are required" },
+        { error: "Invalid request body. Could not parse JSON." },
+        { status: 400 }
+      )
+    }
+
+    let { title, description, price, condition, imageUrl, categoryId } = body
+
+    // Validate and sanitize required fields
+    const missingFields: string[] = []
+    
+    // Title validation
+    if (!title || (typeof title === 'string' && title.trim().length === 0)) {
+      missingFields.push("title")
+    } else {
+      title = title.trim()
+    }
+    
+    // Description - provide default if empty
+    if (!description || (typeof description === 'string' && description.trim().length === 0)) {
+      description = "No description provided." // Provide a default description
+    } else {
+      description = description.trim()
+    }
+    
+    // Price validation
+    const priceNum = parseFloat(price)
+    if (!price || isNaN(priceNum) || priceNum <= 0) {
+      missingFields.push("price (must be a valid number greater than 0)")
+    }
+    
+    // Condition validation
+    if (!condition || (typeof condition === 'string' && condition.trim().length === 0)) {
+      missingFields.push("condition")
+    } else {
+      condition = condition.trim()
+    }
+
+    if (missingFields.length > 0) {
+      return NextResponse.json(
+        { 
+          error: `Missing or invalid required fields: ${missingFields.join(", ")}`,
+          received: { 
+            title: title || null, 
+            description: description || null, 
+            price, 
+            condition: condition || null 
+          }
+        },
         { status: 400 }
       )
     }
@@ -307,10 +353,12 @@ export async function POST(req: Request) {
       listingUrl: `https://www.ebay.com/itm/${publishData.listingId}`,
     })
   } catch (error) {
+    console.error("Error in eBay list endpoint:", error)
     return NextResponse.json(
       { 
         error: "Something went wrong", 
-        details: error instanceof Error ? error.message : "Unknown error" 
+        details: error instanceof Error ? error.message : "Unknown error",
+        stack: error instanceof Error ? error.stack : undefined
       },
       { status: 500 }
     )

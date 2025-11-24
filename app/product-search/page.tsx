@@ -168,20 +168,31 @@ export default function ProductSearchPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          title: editedTitle || productData.title,
+          title: editedTitle || productData.title || "",
           description: editedDescription || productData.shortDescription || productData.description || "",
           price: editedPrice || productData.price?.value || "0.00",
           condition: editedCondition || productData.condition || "Brand New",
-          imageUrl: productData.image?.imageUrl,
-          categoryId: productData.categoryId,
+          imageUrl: productData.image?.imageUrl || "",
+          categoryId: productData.categoryId || "",
         }),
       })
       
-      const data = await response.json()
+      let data
+      try {
+        data = await response.json()
+      } catch (jsonError) {
+        throw new Error(`Failed to parse response: ${response.status} ${response.statusText}`)
+      }
       
       if (!response.ok) {
         // Build a more detailed error message
         let errorMessage = data.error || "Failed to list product on eBay"
+        
+        // Add received data for debugging if available
+        if (data.received) {
+          console.error("Received data:", data.received)
+        }
+        
         if (data.details?.errors?.[0]?.message) {
           errorMessage += `: ${data.details.errors[0].message}`
         } else if (data.details?.errors?.[0]?.longMessage) {
