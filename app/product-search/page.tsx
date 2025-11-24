@@ -571,6 +571,13 @@ export default function ProductSearchPage() {
                     required
                   />
                   <button
+                    type="submit"
+                    disabled={loading}
+                    className="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold rounded-lg transition-colors duration-200"
+                  >
+                    {loading ? "Searching..." : "Search"}
+                  </button>
+                  <button
                     type="button"
                     onClick={scannerActive ? stopScanner : startScanner}
                     className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors duration-200 flex items-center gap-2"
@@ -590,13 +597,6 @@ export default function ProductSearchPage() {
                         Scan Barcode
                       </>
                     )}
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold rounded-lg transition-colors duration-200"
-                  >
-                    {loading ? "Searching..." : "Search"}
                   </button>
                 </div>
               </div>

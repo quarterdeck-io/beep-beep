@@ -38,8 +38,9 @@ export async function GET() {
     ebayAuthUrl.searchParams.set("response_type", "code")
     ebayAuthUrl.searchParams.set("redirect_uri", ruName)
     ebayAuthUrl.searchParams.set("scope", scope)
-    ebayAuthUrl.searchParams.set("state", session.user.id) // Use user ID as state for security
-    ebayAuthUrl.searchParams.set("prompt", "login consent") // Force showing consent screen
+    // Add timestamp to state to force new authorization
+    ebayAuthUrl.searchParams.set("state", `${session.user.id}-${Date.now()}`) // Use user ID + timestamp as state
+    ebayAuthUrl.searchParams.set("prompt", "login") // Force showing login and consent screen
 
     return NextResponse.redirect(ebayAuthUrl.toString())
   } catch (error) {
