@@ -71,6 +71,11 @@ export async function GET(req: Request) {
 
     const tokenData = await tokenResponse.json()
 
+    // Log the scopes that were granted (for verification)
+    // Note: eBay doesn't always return scopes in token response, but we log what we requested
+    console.log("eBay token exchange successful. Scopes requested:", process.env.EBAY_SCOPE)
+    console.log("Token expires in:", tokenData.expires_in, "seconds")
+
     // Save tokens to database
     await prisma.ebayToken.upsert({
       where: { userId: session.user.id },
