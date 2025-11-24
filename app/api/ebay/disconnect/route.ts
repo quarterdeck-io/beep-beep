@@ -18,15 +18,16 @@ export async function POST() {
       where: { userId: session.user.id }
     })
 
-    // Try to revoke the token on eBay's side
+    // Try to revoke the tokens on eBay's side
     if (ebayToken?.accessToken) {
       try {
         const isSandbox = process.env.EBAY_SANDBOX === "true"
         const revokeEndpoint = isSandbox
-          ? "https://api.sandbox.ebay.com/identity/v1/oauth2/revoke"
-          : "https://api.ebay.com/identity/v1/oauth2/revoke"
+          ? "https://api.sandbox.ebay.com/identity/v1/oauth2/token/revoke"
+          : "https://api.ebay.com/identity/v1/oauth2/token/revoke"
 
-        await fetch(revokeEndpoint, {
+        // Revoke access token
+        const revokeResponse = await fetch(revokeEndpoint, {
           method: "POST",
           headers: {
             "Content-Type": "application/x-www-form-urlencoded",
@@ -39,6 +40,25 @@ export async function POST() {
             token_type_hint: "access_token",
           }),
         })
+
+        // Also revoke refresh token if available
+        if (ebayToken.refreshToken) {
+          await fetch(revokeEndpoint, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded",
+              Authorization: `Basic ${Buffer.from(
+                `${process.env.EBAY_CLIENT_ID}:${process.env.EBAY_CLIENT_SECRET}`
+              ).toString("base64")}`,
+            },
+            body: new URLSearchParams({
+              token: ebayToken.refreshToken,
+              token_type_hint: "refresh_token",
+            }),
+          })
+        }
+
+        console.log("Token revoked on eBay side:", revokeResponse.ok)
       } catch (revokeError) {
         // If revocation fails, continue with local deletion
         console.error("Failed to revoke token on eBay:", revokeError)

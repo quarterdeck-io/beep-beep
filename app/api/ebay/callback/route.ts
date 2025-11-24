@@ -18,7 +18,10 @@ export async function GET(req: Request) {
 
     const session = await auth()
     
-    if (!session || session.user.id !== state) {
+    // Extract user ID from state (format: userId-timestamp)
+    const userIdFromState = state?.split("-")[0]
+    
+    if (!session || !userIdFromState || session.user.id !== userIdFromState) {
       return NextResponse.redirect(
         new URL("/ebay-connect?error=unauthorized", process.env.NEXTAUTH_URL || "http://localhost:3000")
       )
