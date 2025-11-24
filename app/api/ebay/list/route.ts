@@ -148,25 +148,29 @@ export async function POST(req: Request) {
 
     // Step 1: Create an inventory item
     // eBay requires SKU to be provided upfront
-    // Note: eBay Inventory API structure - we'll use a minimal required structure
+    // Note: eBay Inventory API may require product identifiers or a different structure
+    // For now, we'll try a simpler approach that might work better
     const inventoryItemPayload: any = {
       sku: sku,
-      product: {
-        title: title.substring(0, 80), // eBay title limit is 80 characters
-      },
       condition: mapConditionToEbay(condition),
     }
     
-    // Add description if provided (some categories require it)
-    // Note: Description should be in the product object for inventory items
-    if (description && description.trim().length > 0) {
-      inventoryItemPayload.product.description = description.substring(0, 50000)
+    // Build product object - eBay requires at minimum a title
+    const productObj: any = {
+      title: title.substring(0, 80), // eBay title limit is 80 characters
+    }
+    
+    // Add description if provided
+    if (description && description.trim().length > 0 && description !== "No description") {
+      productObj.description = description.substring(0, 50000)
     }
     
     // Add images if provided - eBay expects imageUrls array
     if (imageUrl && imageUrl.trim().length > 0) {
-      inventoryItemPayload.product.imageUrls = [imageUrl]
+      productObj.imageUrls = [imageUrl]
     }
+    
+    inventoryItemPayload.product = productObj
     
     // Log the payload for debugging
     console.log("Creating inventory item with payload:", JSON.stringify(inventoryItemPayload, null, 2))
@@ -200,12 +204,23 @@ export async function POST(req: Request) {
       const errorMessage = errorData.errors?.[0]?.message || errorData.errors?.[0]?.longMessage || errorData.message || "Failed to create inventory item"
       const errorCode = errorData.errors?.[0]?.errorId || errorData.errors?.[0]?.code
       
+      // Provide more specific hints based on error code
+      let hint = "Make sure your eBay account has selling privileges and the required permissions."
+      
+      if (errorCode === 2004) {
+        hint = "Error 2004: This usually means your OAuth token doesn't have the 'sell.inventory' scope, or your seller account isn't fully set up. Please reconnect your eBay account with the correct scopes."
+      } else if (errorMessage.includes("scope") || errorMessage.includes("permission")) {
+        hint = "Your OAuth token is missing required scopes. Please reconnect your eBay account and ensure 'sell.inventory' scope is included."
+      } else if (errorMessage.includes("seller") || errorMessage.includes("account")) {
+        hint = "Your eBay seller account may not be fully set up. Please complete your seller registration on eBay first."
+      }
+      
       return NextResponse.json(
         { 
           error: errorMessage,
           errorCode: errorCode,
           details: errorData,
-          hint: errorData.errors?.[0]?.longMessage || "Make sure your eBay account has selling privileges and the required permissions. You may need to set up your seller account first."
+          hint: hint
         },
         { status: inventoryResponse.status }
       )
