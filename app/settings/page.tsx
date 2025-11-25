@@ -12,6 +12,8 @@ export default function SettingsPage() {
   const [savingCounter, setSavingCounter] = useState(false)
   const [savingPrefix, setSavingPrefix] = useState(false)
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
+  const [searchQuery, setSearchQuery] = useState<string>("")
+  const [showSearch, setShowSearch] = useState(false)
 
   // Fetch current settings on mount
   useEffect(() => {
@@ -128,6 +130,66 @@ export default function SettingsPage() {
           <p className="text-gray-600 dark:text-gray-400 mb-6">
             Configure your eBay business policies and listing settings before creating listings.
           </p>
+
+          {/* Search Section */}
+          <div className="mb-6">
+            <button
+              onClick={() => setShowSearch(!showSearch)}
+              className="flex items-center gap-2 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              {showSearch ? "Hide Search" : "Search SKU Settings"}
+            </button>
+
+            {showSearch && (
+              <div className="mt-4 p-4 bg-white dark:bg-gray-800 rounded-lg shadow">
+                <div className="flex gap-3">
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search by counter or prefix (e.g., '689', 'ASS', 'SKU-1')"
+                    className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                  <button
+                    onClick={() => {
+                      // Search logic - filter current settings
+                      const query = searchQuery.toLowerCase()
+                      const matchesCounter = nextSkuCounter.toString().includes(query)
+                      const matchesPrefix = (skuPrefix || "Auto-detection").toLowerCase().includes(query)
+                      const matchesSku = `${skuPrefix || "SKU"}-${nextSkuCounter}`.toLowerCase().includes(query)
+                      
+                      if (matchesCounter || matchesPrefix || matchesSku) {
+                        setMessage({ type: "success", text: `✓ Found: Counter ${nextSkuCounter}, Prefix: ${skuPrefix || "Auto-detection"}` })
+                      } else {
+                        setMessage({ type: "error", text: "No matching SKU settings found" })
+                      }
+                    }}
+                    className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                  >
+                    Search
+                  </button>
+                  <button
+                    onClick={() => {
+                      setSearchQuery("")
+                      setMessage(null)
+                    }}
+                    className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                  >
+                    Clear
+                  </button>
+                </div>
+                {searchQuery && (
+                  <div className="mt-3 text-sm text-gray-600 dark:text-gray-400">
+                    <p>Current SKU Format: <strong className="text-gray-900 dark:text-white">{skuPrefix || "SKU"}-{nextSkuCounter}</strong></p>
+                    <p className="mt-1">Next SKU will be: <strong className="text-gray-900 dark:text-white">{skuPrefix || "SKU"}-{nextSkuCounter}</strong></p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* Success/Error Message */}
           {message && (
