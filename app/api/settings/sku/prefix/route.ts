@@ -40,8 +40,9 @@ export async function POST(req: Request) {
     })
   } catch (error) {
     console.error("Error updating SKU prefix:", error)
+    const errorMessage = error instanceof Error ? error.message : "Unknown error"
     return NextResponse.json(
-      { error: "Failed to update SKU prefix" },
+      { error: "Failed to update SKU prefix", details: errorMessage },
       { status: 500 }
     )
   }
