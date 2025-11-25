@@ -12,6 +12,7 @@ export default function Navigation() {
     { href: "/dashboard", label: "Dashboard" },
     { href: "/ebay-connect", label: "Connect eBay" },
     { href: "/product-search", label: "Product Search" },
+    { href: "/settings", label: "Settings" },
   ]
 
   return (

@@ -21,6 +21,7 @@ model User {
   accounts      Account[]
   sessions      Session[]
   ebayTokens    EbayToken[]
+  skuSettings   SkuSettings?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 }
@@ -76,5 +77,16 @@ model EbayToken {
   updatedAt    DateTime @updatedAt
 
   @@unique([userId])
+}
+
+// SKU Settings Model
+model SkuSettings {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  nextSkuCounter Int     @default(1)
+  skuPrefix     String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
 
