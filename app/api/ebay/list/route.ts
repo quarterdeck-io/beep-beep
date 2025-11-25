@@ -254,9 +254,9 @@ export async function POST(req: Request) {
       let hint = "Make sure your eBay account has selling privileges and the required permissions."
       
       if (errorCode === 2004) {
-        hint = "Error 2004: This usually means your OAuth token doesn't have the 'sell.inventory' scope, or your seller account isn't fully set up. Please reconnect your eBay account with the correct scopes."
+        hint = "Error 2004: Your OAuth token is missing the 'sell.inventory' scope. To fix this:\n1. Go to /ebay-connect page\n2. Click 'Disconnect & Revoke Access'\n3. Make sure EBAY_SCOPE environment variable includes: https://api.ebay.com/oauth/api_scope/sell.inventory\n4. Click 'Connect eBay Account' again to get a new token with correct scopes"
       } else if (errorMessage.includes("scope") || errorMessage.includes("permission")) {
-        hint = "Your OAuth token is missing required scopes. Please reconnect your eBay account and ensure 'sell.inventory' scope is included."
+        hint = "Your OAuth token is missing required scopes. Please:\n1. Disconnect your eBay account at /ebay-connect\n2. Verify EBAY_SCOPE includes: https://api.ebay.com/oauth/api_scope/sell.inventory\n3. Reconnect your eBay account"
       } else if (errorMessage.includes("seller") || errorMessage.includes("account")) {
         hint = "Your eBay seller account may not be fully set up. Please complete your seller registration on eBay first."
       }
