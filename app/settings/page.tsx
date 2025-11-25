@@ -65,7 +65,8 @@ export default function SettingsPage() {
         setInitialSkuInput("")
         setMessage({ type: "success", text: "✓ SKU configured successfully" })
       } else {
-        setMessage({ type: "error", text: data.error || "Failed to save SKU counter" })
+        const errorMsg = data.details ? `${data.error}: ${data.details}` : (data.error || "Failed to save SKU counter")
+        setMessage({ type: "error", text: errorMsg })
       }
     } catch (error) {
       setMessage({ type: "error", text: "Failed to save SKU counter" })
@@ -93,7 +94,8 @@ export default function SettingsPage() {
         setSkuPrefix(data.skuPrefix)
         setMessage({ type: "success", text: "✓ Prefix configured successfully" })
       } else {
-        setMessage({ type: "error", text: data.error || "Failed to save prefix" })
+        const errorMsg = data.details ? `${data.error}: ${data.details}` : (data.error || "Failed to save prefix")
+        setMessage({ type: "error", text: errorMsg })
       }
     } catch (error) {
       setMessage({ type: "error", text: "Failed to save prefix" })

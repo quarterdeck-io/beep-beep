@@ -52,8 +52,9 @@ export async function POST(req: Request) {
     })
   } catch (error) {
     console.error("Error updating SKU counter:", error)
+    const errorMessage = error instanceof Error ? error.message : "Unknown error"
     return NextResponse.json(
-      { error: "Failed to update SKU counter" },
+      { error: "Failed to update SKU counter", details: errorMessage },
       { status: 500 }
     )
   }

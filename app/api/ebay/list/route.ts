@@ -144,19 +144,48 @@ export async function POST(req: Request) {
       : "https://api.ebay.com"
 
     // Get or create SKU settings for the user
-    let skuSettings = await prisma.skuSettings.findUnique({
-      where: { userId: session.user.id }
-    })
-
-    // If no settings exist, create default ones
-    if (!skuSettings) {
-      skuSettings = await prisma.skuSettings.create({
-        data: {
-          userId: session.user.id,
-          nextSkuCounter: 1,
-          skuPrefix: null,
-        }
+    let skuSettings: { nextSkuCounter: number; skuPrefix: string | null } = {
+      nextSkuCounter: 1,
+      skuPrefix: null,
+    }
+    let shouldIncrementCounter = false
+    
+    try {
+      // @ts-ignore - Prisma Client may not have types yet, but model exists in DB
+      const existingSettings = await prisma.skuSettings.findUnique({
+        where: { userId: session.user.id }
       })
+
+      if (existingSettings) {
+        skuSettings = {
+          nextSkuCounter: existingSettings.nextSkuCounter,
+          skuPrefix: existingSettings.skuPrefix,
+        }
+        shouldIncrementCounter = true
+      } else {
+        // If no settings exist, create default ones
+        try {
+          // @ts-ignore
+          const newSettings = await prisma.skuSettings.create({
+            data: {
+              userId: session.user.id,
+              nextSkuCounter: 1,
+              skuPrefix: null,
+            }
+          })
+          skuSettings = {
+            nextSkuCounter: newSettings.nextSkuCounter,
+            skuPrefix: newSettings.skuPrefix,
+          }
+          shouldIncrementCounter = true
+        } catch (createError) {
+          // If create fails, use defaults
+          console.warn("Could not create SKU settings, using defaults:", createError)
+        }
+      }
+    } catch (error) {
+      // Fallback if Prisma Client types aren't updated yet
+      console.warn("SKU settings not available, using default:", error)
     }
 
     // Generate SKU using user's settings
@@ -406,16 +435,19 @@ export async function POST(req: Request) {
     const publishData = await publishResponse.json()
 
     // Update SKU counter after successful listing
-    try {
-      await prisma.skuSettings.update({
-        where: { userId: session.user.id },
-        data: {
-          nextSkuCounter: skuSettings.nextSkuCounter + 1,
-        }
-      })
-    } catch (error) {
-      // Log error but don't fail the listing if counter update fails
-      console.error("Failed to update SKU counter:", error)
+    if (shouldIncrementCounter) {
+      try {
+        // @ts-ignore - Prisma Client may not have types yet, but model exists in DB
+        await prisma.skuSettings.update({
+          where: { userId: session.user.id },
+          data: {
+            nextSkuCounter: skuSettings.nextSkuCounter + 1,
+          }
+        })
+      } catch (error) {
+        // Log error but don't fail the listing if counter update fails
+        console.error("Failed to update SKU counter:", error)
+      }
     }
 
     return NextResponse.json({
