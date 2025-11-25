@@ -143,8 +143,27 @@ export async function POST(req: Request) {
       ? "https://api.sandbox.ebay.com"
       : "https://api.ebay.com"
 
-    // Generate a unique SKU for this listing
-    const sku = `SKU-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
+    // Get or create SKU settings for the user
+    let skuSettings = await prisma.skuSettings.findUnique({
+      where: { userId: session.user.id }
+    })
+
+    // If no settings exist, create default ones
+    if (!skuSettings) {
+      skuSettings = await prisma.skuSettings.create({
+        data: {
+          userId: session.user.id,
+          nextSkuCounter: 1,
+          skuPrefix: null,
+        }
+      })
+    }
+
+    // Generate SKU using user's settings
+    const prefix = skuSettings.skuPrefix || "SKU"
+    const sku = `${prefix}-${skuSettings.nextSkuCounter}`
+    
+    // Increment the counter for next time (we'll update it after successful listing)
 
     // Step 1: Create an inventory item
     // eBay requires SKU to be provided upfront
@@ -385,6 +404,19 @@ export async function POST(req: Request) {
     }
 
     const publishData = await publishResponse.json()
+
+    // Update SKU counter after successful listing
+    try {
+      await prisma.skuSettings.update({
+        where: { userId: session.user.id },
+        data: {
+          nextSkuCounter: skuSettings.nextSkuCounter + 1,
+        }
+      })
+    } catch (error) {
+      // Log error but don't fail the listing if counter update fails
+      console.error("Failed to update SKU counter:", error)
+    }
 
     return NextResponse.json({
       success: true,
