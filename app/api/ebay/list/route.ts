@@ -151,8 +151,7 @@ export async function POST(req: Request) {
     let shouldIncrementCounter = false
     
     try {
-      // @ts-ignore - Prisma Client may not have types yet, but model exists in DB
-      const existingSettings = await prisma.skuSettings.findUnique({
+      const existingSettings = await (prisma as any).skuSettings.findUnique({
         where: { userId: session.user.id }
       })
 
@@ -165,8 +164,7 @@ export async function POST(req: Request) {
       } else {
         // If no settings exist, create default ones
         try {
-          // @ts-ignore
-          const newSettings = await prisma.skuSettings.create({
+          const newSettings = await (prisma as any).skuSettings.create({
             data: {
               userId: session.user.id,
               nextSkuCounter: 1,
@@ -437,8 +435,7 @@ export async function POST(req: Request) {
     // Update SKU counter after successful listing
     if (shouldIncrementCounter) {
       try {
-        // @ts-ignore - Prisma Client may not have types yet, but model exists in DB
-        await prisma.skuSettings.update({
+        await (prisma as any).skuSettings.update({
           where: { userId: session.user.id },
           data: {
             nextSkuCounter: skuSettings.nextSkuCounter + 1,
