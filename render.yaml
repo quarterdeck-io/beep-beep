@@ -5,7 +5,7 @@ services:
     env: node
     region: oregon
     plan: free
-    buildCommand: npm ci && npx prisma migrate deploy && npm run build
+    buildCommand: npm ci && node scripts/fix-migrations.js && npm run build
     startCommand: npm start
     envVars:
       - key: NODE_ENV
