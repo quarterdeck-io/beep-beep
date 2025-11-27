@@ -25,14 +25,13 @@ export async function GET() {
     const scope = process.env.EBAY_SCOPE || "https://api.ebay.com/oauth/api_scope"
     
     // Validate that required scopes are present
-    // Required scopes for listing products:
-    // - sell.inventory (create/update inventory items)
-    // - sell.account/readwrite (manage account settings)
-    // - sell.fulfillment (order fulfillment)
+    // Required scope for listing products:
+    // - sell.inventory (create/update inventory items) - REQUIRED
+    // Optional but recommended:
+    // - sell.inventory.readonly (read inventory)
+    // - https://api.ebay.com/oauth/api_scope (for browsing/searching)
     const requiredScopes = [
-      "sell.inventory",
-      "sell.account/readwrite",
-      "sell.fulfillment"
+      "sell.inventory"  // This is the minimum required for listing
     ]
     
     const scopeArray = scope.split(" ").filter(s => s.trim())
@@ -42,7 +41,7 @@ export async function GET() {
     
     if (!hasRequiredScopes) {
       console.error("Missing required eBay scopes. Current scopes:", scope)
-      console.error("Required scopes:", requiredScopes)
+      console.error("Required scope: sell.inventory")
       return NextResponse.redirect(
         new URL("/ebay-connect?error=missing_scopes", process.env.NEXTAUTH_URL || "http://localhost:3000")
       )
