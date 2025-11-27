@@ -252,11 +252,35 @@ export async function POST(req: Request) {
       
       // Provide more specific hints based on error code
       let hint = "Make sure your eBay account has selling privileges and the required permissions."
+      let needsReconnect = false
       
       if (errorCode === 2004) {
-        hint = "Error 2004: Your OAuth token is missing the 'sell.inventory' scope. To fix this:\n1. Go to /ebay-connect page\n2. Click 'Disconnect & Revoke Access'\n3. Make sure EBAY_SCOPE environment variable includes: https://api.ebay.com/oauth/api_scope/sell.inventory\n4. Click 'Connect eBay Account' again to get a new token with correct scopes"
+        // Error 2004: Token missing required scopes - automatically clear the invalid token
+        console.error("Error 2004 detected: Token missing sell.inventory scope. Clearing invalid token.")
+        try {
+          await prisma.ebayToken.delete({
+            where: { userId: session.user.id }
+          })
+          console.log("Invalid token cleared. User must reconnect with correct scopes.")
+        } catch (deleteError) {
+          console.error("Failed to clear invalid token:", deleteError)
+        }
+        
+        hint = "Error 2004: Your OAuth token was missing the 'sell.inventory' scope. The invalid token has been cleared. Please:\n1. Go to /ebay-connect page\n2. Click 'Connect eBay Account' to reconnect with the correct scopes\n3. Try listing again"
+        needsReconnect = true
       } else if (errorMessage.includes("scope") || errorMessage.includes("permission")) {
-        hint = "Your OAuth token is missing required scopes. Please:\n1. Disconnect your eBay account at /ebay-connect\n2. Verify EBAY_SCOPE includes: https://api.ebay.com/oauth/api_scope/sell.inventory\n3. Reconnect your eBay account"
+        // Other scope/permission errors - also clear token
+        console.error("Scope/permission error detected. Clearing token.")
+        try {
+          await prisma.ebayToken.delete({
+            where: { userId: session.user.id }
+          })
+          needsReconnect = true
+        } catch (deleteError) {
+          console.error("Failed to clear invalid token:", deleteError)
+        }
+        
+        hint = "Your OAuth token is missing required scopes. The token has been cleared. Please:\n1. Go to /ebay-connect page\n2. Click 'Connect eBay Account' to reconnect\n3. Verify EBAY_SCOPE includes: https://api.ebay.com/oauth/api_scope/sell.inventory"
       } else if (errorMessage.includes("seller") || errorMessage.includes("account")) {
         hint = "Your eBay seller account may not be fully set up. Please complete your seller registration on eBay first."
       }
@@ -266,7 +290,8 @@ export async function POST(req: Request) {
           error: errorMessage,
           errorCode: errorCode,
           details: errorData,
-          hint: hint
+          hint: hint,
+          needsReconnect: needsReconnect
         },
         { status: inventoryResponse.status }
       )
