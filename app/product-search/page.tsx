@@ -185,6 +185,24 @@ export default function ProductSearchPage() {
       }
       
       if (!response.ok) {
+        // Check if reconnection is needed
+        if (data.needsReconnect) {
+          setIsConnected(false)
+          // Build error message with reconnection instructions
+          let errorMessage = data.error || "eBay connection needs to be refreshed"
+          if (data.hint) {
+            errorMessage = data.hint.replace(/\n/g, " ")
+          }
+          // Add a clear call-to-action
+          errorMessage += " Please reconnect your eBay account to continue."
+          setListingError(errorMessage)
+          // Redirect to connect page after a short delay
+          setTimeout(() => {
+            router.push("/ebay-connect")
+          }, 2000)
+          return
+        }
+        
         // Build a more detailed error message
         let errorMessage = data.error || "Failed to list product on eBay"
         
