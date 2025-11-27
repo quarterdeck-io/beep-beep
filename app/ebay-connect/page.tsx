@@ -38,7 +38,7 @@ function EbayConnectContent() {
       const errorMessages: Record<string, string> = {
         missing_credentials: "eBay API credentials not configured. Please add EBAY_CLIENT_ID and EBAY_CLIENT_SECRET to your .env.local file.",
         missing_runame: "eBay RuName (Redirect URL name) not configured. Please register your callback URL in eBay Developer Portal and add EBAY_RUNAME to your .env.local file.",
-        missing_scopes: "Required eBay scopes are missing. Please ensure EBAY_SCOPE includes 'sell.inventory' and 'sell.inventory.readonly'. For local dev, add to .env.local and restart. For production (Render), add to Environment variables in Render dashboard and redeploy.",
+        missing_scopes: "Required eBay scopes are missing. Please ensure EBAY_SCOPE includes 'sell.inventory' (required for listing products). For local dev, add to .env.local and restart your dev server. For production (Render), add to Environment variables in Render dashboard and redeploy.",
         misconfigured: "eBay OAuth configuration is incomplete. Please check your .env.local file and ensure all required eBay credentials are set.",
         oauth_failed: "Failed to initiate OAuth flow. Please try again.",
         oauth_declined: "You declined the eBay authorization.",
