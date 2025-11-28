@@ -291,16 +291,18 @@ export async function POST(req: Request) {
         // Error 2004: Token missing required scopes - automatically clear the invalid token
         console.error("Error 2004 detected: Token missing sell.inventory scope. Clearing invalid token.")
         console.error("Full error details:", JSON.stringify(errorData, null, 2))
+        console.error("Current EBAY_SCOPE:", process.env.EBAY_SCOPE)
+        
         try {
           await prisma.ebayToken.delete({
             where: { userId: session.user.id }
           })
           console.log("Invalid token cleared. User must reconnect with correct scopes.")
           needsReconnect = true
-          hint = "Your eBay connection needs to be refreshed. The invalid token has been cleared. You'll be redirected to reconnect your eBay account with the correct permissions."
+          hint = "Error 2004: Your eBay token is missing the 'sell.inventory' scope required for listing. The invalid token has been cleared. Please reconnect your eBay account - you'll be redirected to the connection page. Make sure EBAY_SCOPE includes 'sell.inventory' before reconnecting."
         } catch (deleteError) {
           console.error("Failed to clear invalid token:", deleteError)
-          hint = "Error 2004: Your OAuth token is missing the 'sell.inventory' scope. Please disconnect and reconnect your eBay account."
+          hint = "Error 2004: Your OAuth token is missing the 'sell.inventory' scope. Please disconnect and reconnect your eBay account. Make sure EBAY_SCOPE environment variable includes 'sell.inventory'."
         }
       } else if (inventoryResponse.status === 401 && errorCode !== 2004) {
         // 401 but not error 2004 - might be token expired or invalid, but don't delete automatically
