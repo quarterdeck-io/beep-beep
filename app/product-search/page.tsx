@@ -208,13 +208,17 @@ export default function ProductSearchPage() {
               if (data.hint) {
                 errorMessage = data.hint.replace(/\n/g, " ")
               }
-              // Add a clear call-to-action
-              errorMessage += " Please reconnect your eBay account to continue."
+              
+              // Special handling for error 2004
+              if (data.errorCode === 2004) {
+                errorMessage = "Error 2004: Your eBay token is missing the 'sell.inventory' scope required for listing products. The account has been disconnected. You'll be redirected to reconnect - make sure to grant all permissions when reconnecting."
+              }
+              
               setListingError(errorMessage)
               // Redirect to connect page after a short delay
               setTimeout(() => {
                 router.push("/ebay-connect")
-              }, 2000)
+              }, 3000) // Give user time to read the error message
               return
             } else {
               // Token still exists, so don't show as disconnected
