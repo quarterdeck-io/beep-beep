@@ -45,6 +45,7 @@ function EbayConnectContent() {
         unauthorized: "Unauthorized request. Please try again.",
         no_code: "No authorization code received from eBay.",
         token_exchange_failed: "Failed to exchange authorization code for access token.",
+        redirect_uri_mismatch: "Redirect URI mismatch. The RuName in your environment variables must match exactly what's registered in eBay Developer Portal. Please verify your EBAY_RUNAME value matches the RuName from eBay Developer Portal exactly (no extra spaces or characters).",
         callback_failed: "OAuth callback failed. Please try again."
       }
       setError(errorMessages[errorParam] || "An unknown error occurred")
