@@ -115,12 +115,36 @@ export async function POST(req: Request) {
       })
 
       if (!refreshResponse.ok) {
+        const refreshErrorData = await refreshResponse.json().catch(() => ({}))
+        console.error("Token refresh failed:", refreshErrorData)
+        
+        // Only delete token if refresh fails with 400/401 (invalid/expired refresh token)
+        // Don't delete for other errors (network issues, etc.)
+        if (refreshResponse.status === 400 || refreshResponse.status === 401) {
+          try {
+            await prisma.ebayToken.delete({
+              where: { userId: session.user.id }
+            })
+            console.log("Token deleted after failed refresh")
+          } catch (deleteError) {
+            console.error("Failed to delete token after refresh failure:", deleteError)
+          }
+          return NextResponse.json(
+            { 
+              error: "Failed to refresh eBay token. Please reconnect your eBay account.",
+              needsReconnect: true
+            },
+            { status: 401 }
+          )
+        }
+        
+        // For other errors, don't delete token - just return error
         return NextResponse.json(
           { 
-            error: "Failed to refresh eBay token. Please reconnect your eBay account.",
-            needsReconnect: true
+            error: "Failed to refresh eBay token. Please try again.",
+            details: refreshErrorData
           },
-          { status: 401 }
+          { status: refreshResponse.status }
         )
       }
 
@@ -254,6 +278,8 @@ export async function POST(req: Request) {
       let hint = "Make sure your eBay account has selling privileges and the required permissions."
       let needsReconnect = false
       
+      // Only delete token for specific error codes that indicate scope/permission issues
+      // Error 2004 specifically means "OAuth token is missing required scopes"
       if (errorCode === 2004) {
         // Error 2004: Token missing required scopes - automatically clear the invalid token
         console.error("Error 2004 detected: Token missing sell.inventory scope. Clearing invalid token.")
@@ -262,27 +288,21 @@ export async function POST(req: Request) {
             where: { userId: session.user.id }
           })
           console.log("Invalid token cleared. User must reconnect with correct scopes.")
-        } catch (deleteError) {
-          console.error("Failed to clear invalid token:", deleteError)
-        }
-        
-        hint = "Your eBay connection needs to be refreshed. The invalid token has been cleared. You'll be redirected to reconnect your eBay account with the correct permissions."
-        needsReconnect = true
-      } else if (errorMessage.includes("scope") || errorMessage.includes("permission")) {
-        // Other scope/permission errors - also clear token
-        console.error("Scope/permission error detected. Clearing token.")
-        try {
-          await prisma.ebayToken.delete({
-            where: { userId: session.user.id }
-          })
           needsReconnect = true
+          hint = "Your eBay connection needs to be refreshed. The invalid token has been cleared. You'll be redirected to reconnect your eBay account with the correct permissions."
         } catch (deleteError) {
           console.error("Failed to clear invalid token:", deleteError)
+          hint = "Error 2004: Your OAuth token is missing the 'sell.inventory' scope. Please disconnect and reconnect your eBay account."
         }
-        
-        hint = "Your eBay connection needs to be refreshed. The token has been cleared. You'll be redirected to reconnect your eBay account."
+      } else if (errorCode === 2001 || errorCode === 2002 || errorCode === 2003) {
+        // Other OAuth-related errors that might indicate token issues
+        // But don't delete token automatically - let user try again or reconnect manually
+        hint = `eBay API Error ${errorCode}: ${errorMessage}. If this persists, please try disconnecting and reconnecting your eBay account.`
       } else if (errorMessage.includes("seller") || errorMessage.includes("account")) {
         hint = "Your eBay seller account may not be fully set up. Please complete your seller registration on eBay first."
+      } else {
+        // For other errors, don't delete the token - just show the error
+        hint = errorMessage
       }
       
       return NextResponse.json(
