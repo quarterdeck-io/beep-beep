@@ -258,6 +258,13 @@ export async function POST(req: Request) {
       }
     )
 
+    // Check for 401 Unauthorized - token might be invalid
+    if (inventoryResponse.status === 401) {
+      console.error("401 Unauthorized from eBay Inventory API - token may be invalid")
+      // Don't delete token immediately - might be a temporary issue
+      // Only delete if we get error 2004 specifically
+    }
+
     if (!inventoryResponse.ok) {
       const errorData = await inventoryResponse.json().catch(() => ({}))
       const errorText = await inventoryResponse.text().catch(() => "")
@@ -283,6 +290,7 @@ export async function POST(req: Request) {
       if (errorCode === 2004) {
         // Error 2004: Token missing required scopes - automatically clear the invalid token
         console.error("Error 2004 detected: Token missing sell.inventory scope. Clearing invalid token.")
+        console.error("Full error details:", JSON.stringify(errorData, null, 2))
         try {
           await prisma.ebayToken.delete({
             where: { userId: session.user.id }
@@ -294,14 +302,26 @@ export async function POST(req: Request) {
           console.error("Failed to clear invalid token:", deleteError)
           hint = "Error 2004: Your OAuth token is missing the 'sell.inventory' scope. Please disconnect and reconnect your eBay account."
         }
+      } else if (inventoryResponse.status === 401 && errorCode !== 2004) {
+        // 401 but not error 2004 - might be token expired or invalid, but don't delete automatically
+        console.error("401 Unauthorized but not error 2004. Error code:", errorCode)
+        console.error("Full error details:", JSON.stringify(errorData, null, 2))
+        hint = `Authentication error (${errorCode || 'unknown'}): ${errorMessage}. Please try again. If this persists, you may need to reconnect your eBay account.`
       } else if (errorCode === 2001 || errorCode === 2002 || errorCode === 2003) {
         // Other OAuth-related errors that might indicate token issues
         // But don't delete token automatically - let user try again or reconnect manually
+        console.error(`OAuth error ${errorCode}:`, errorMessage)
         hint = `eBay API Error ${errorCode}: ${errorMessage}. If this persists, please try disconnecting and reconnecting your eBay account.`
       } else if (errorMessage.includes("seller") || errorMessage.includes("account")) {
         hint = "Your eBay seller account may not be fully set up. Please complete your seller registration on eBay first."
       } else {
         // For other errors, don't delete the token - just show the error
+        console.error("Other error (not deleting token):", {
+          status: inventoryResponse.status,
+          errorCode,
+          errorMessage,
+          errorData
+        })
         hint = errorMessage
       }
       
@@ -397,6 +417,33 @@ export async function POST(req: Request) {
       }
     )
 
+    // Check for 401 Unauthorized - token might be invalid
+    if (offerResponse.status === 401) {
+      console.error("401 Unauthorized from eBay Offer API - token may be invalid")
+      const errorData = await offerResponse.json().catch(() => ({}))
+      const errorCode = errorData.errors?.[0]?.errorId || errorData.errors?.[0]?.code
+      
+      // Only delete token for error 2004 (missing scopes)
+      if (errorCode === 2004) {
+        console.error("Error 2004 in offer creation - deleting token")
+        try {
+          await prisma.ebayToken.delete({
+            where: { userId: session.user.id }
+          })
+          return NextResponse.json(
+            { 
+              error: "Your eBay connection needs to be refreshed. Please reconnect your eBay account.",
+              errorCode: 2004,
+              needsReconnect: true
+            },
+            { status: 401 }
+          )
+        } catch (deleteError) {
+          console.error("Failed to delete token:", deleteError)
+        }
+      }
+    }
+
     if (!offerResponse.ok) {
       const errorData = await offerResponse.json().catch(() => ({}))
       
@@ -460,6 +507,33 @@ export async function POST(req: Request) {
         },
       }
     )
+
+    // Check for 401 Unauthorized - token might be invalid
+    if (publishResponse.status === 401) {
+      console.error("401 Unauthorized from eBay Publish API - token may be invalid")
+      const errorData = await publishResponse.json().catch(() => ({}))
+      const errorCode = errorData.errors?.[0]?.errorId || errorData.errors?.[0]?.code
+      
+      // Only delete token for error 2004 (missing scopes)
+      if (errorCode === 2004) {
+        console.error("Error 2004 in publish - deleting token")
+        try {
+          await prisma.ebayToken.delete({
+            where: { userId: session.user.id }
+          })
+          return NextResponse.json(
+            { 
+              error: "Your eBay connection needs to be refreshed. Please reconnect your eBay account.",
+              errorCode: 2004,
+              needsReconnect: true
+            },
+            { status: 401 }
+          )
+        } catch (deleteError) {
+          console.error("Failed to delete token:", deleteError)
+        }
+      }
+    }
 
     if (!publishResponse.ok) {
       const errorData = await publishResponse.json().catch(() => ({}))

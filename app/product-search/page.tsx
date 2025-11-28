@@ -185,22 +185,46 @@ export default function ProductSearchPage() {
       }
       
       if (!response.ok) {
-        // Check if reconnection is needed
+        // Log the error for debugging
+        console.error("Listing error:", {
+          status: response.status,
+          error: data.error,
+          errorCode: data.errorCode,
+          needsReconnect: data.needsReconnect,
+          details: data.details
+        })
+        
+        // Check if reconnection is needed (only if token was actually deleted)
         if (data.needsReconnect) {
-          setIsConnected(false)
-          // Build error message with reconnection instructions
-          let errorMessage = data.error || "eBay connection needs to be refreshed"
-          if (data.hint) {
-            errorMessage = data.hint.replace(/\n/g, " ")
+          // Verify connection status before showing as disconnected
+          try {
+            const checkRes = await fetch("/api/ebay/check-connection")
+            const checkData = await checkRes.json()
+            // Only set as disconnected if token is actually gone
+            if (!checkData.connected) {
+              setIsConnected(false)
+              // Build error message with reconnection instructions
+              let errorMessage = data.error || "eBay connection needs to be refreshed"
+              if (data.hint) {
+                errorMessage = data.hint.replace(/\n/g, " ")
+              }
+              // Add a clear call-to-action
+              errorMessage += " Please reconnect your eBay account to continue."
+              setListingError(errorMessage)
+              // Redirect to connect page after a short delay
+              setTimeout(() => {
+                router.push("/ebay-connect")
+              }, 2000)
+              return
+            } else {
+              // Token still exists, so don't show as disconnected
+              console.log("Token still exists, not disconnecting")
+            }
+          } catch (checkError) {
+            console.error("Failed to check connection status:", checkError)
+            // If check fails, assume disconnected
+            setIsConnected(false)
           }
-          // Add a clear call-to-action
-          errorMessage += " Please reconnect your eBay account to continue."
-          setListingError(errorMessage)
-          // Redirect to connect page after a short delay
-          setTimeout(() => {
-            router.push("/ebay-connect")
-          }, 2000)
-          return
         }
         
         // Build a more detailed error message
