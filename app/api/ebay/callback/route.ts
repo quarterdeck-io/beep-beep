@@ -39,13 +39,32 @@ export async function GET(req: Request) {
       ? "https://api.sandbox.ebay.com/identity/v1/oauth2/token"
       : "https://api.ebay.com/identity/v1/oauth2/token"
     
-    const ruName = process.env.EBAY_RUNAME || process.env.EBAY_REDIRECT_URI
+    const ruName = (process.env.EBAY_RUNAME || process.env.EBAY_REDIRECT_URI)?.trim()
     
     if (!ruName) {
+      console.error("RuName is missing from environment variables")
       return NextResponse.redirect(
         new URL("/ebay-connect?error=misconfigured", process.env.NEXTAUTH_URL || "http://localhost:3000")
       )
     }
+    
+    // Log the RuName being used (for debugging - RuName is not sensitive)
+    console.log("Using RuName for token exchange:", ruName)
+    console.log("RuName length:", ruName.length)
+    
+    // Build the token exchange request
+    // IMPORTANT: redirect_uri must match EXACTLY what was used in the authorization request
+    const tokenRequestBody = new URLSearchParams({
+      grant_type: "authorization_code",
+      code: code,
+      redirect_uri: ruName, // Must match exactly what was sent in authorization request
+    })
+    
+    console.log("Token exchange request body (without code):", {
+      grant_type: "authorization_code",
+      redirect_uri: ruName,
+      code_length: code.length
+    })
     
     const tokenResponse = await fetch(tokenEndpoint, {
       method: "POST",
@@ -55,18 +74,33 @@ export async function GET(req: Request) {
           `${process.env.EBAY_CLIENT_ID}:${process.env.EBAY_CLIENT_SECRET}`
         ).toString("base64")}`,
       },
-      body: new URLSearchParams({
-        grant_type: "authorization_code",
-        code,
-        redirect_uri: ruName,
-      }),
+      body: tokenRequestBody,
     })
 
     if (!tokenResponse.ok) {
       const errorData = await tokenResponse.json().catch(() => ({}))
-      console.error("eBay token exchange failed:", errorData)
+      const errorText = await tokenResponse.text().catch(() => "")
+      
+      console.error("eBay token exchange failed:", {
+        status: tokenResponse.status,
+        statusText: tokenResponse.statusText,
+        errorData,
+        errorText,
+        ruName: ruName,
+        ruNameLength: ruName.length
+      })
+      
+      // Provide more specific error message based on the error
+      let errorType = "token_exchange_failed"
+      if (errorData.error === "invalid_grant" || errorData.error === "invalid_request") {
+        if (errorData.error_description?.includes("redirect_uri") || errorText.includes("redirect_uri")) {
+          errorType = "redirect_uri_mismatch"
+          console.error("Redirect URI mismatch detected. RuName used:", ruName)
+        }
+      }
+      
       return NextResponse.redirect(
-        new URL("/ebay-connect?error=token_exchange_failed", process.env.NEXTAUTH_URL || "http://localhost:3000")
+        new URL(`/ebay-connect?error=${errorType}`, process.env.NEXTAUTH_URL || "http://localhost:3000")
       )
     }
 

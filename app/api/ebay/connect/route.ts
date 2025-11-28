@@ -19,10 +19,14 @@ export async function GET() {
     // Build eBay OAuth authorization URL (User Consent Flow)
     // eBay uses RuName (Redirect URL name) - a registered identifier instead of actual URL
     const isSandbox = process.env.EBAY_SANDBOX === "true"
-    const ruName = process.env.EBAY_RUNAME || process.env.EBAY_REDIRECT_URI
+    const ruName = (process.env.EBAY_RUNAME || process.env.EBAY_REDIRECT_URI)?.trim()
     
     // Get and validate scopes - MUST include sell.inventory scopes for listing
     const scope = process.env.EBAY_SCOPE || "https://api.ebay.com/oauth/api_scope"
+    
+    // Log RuName for debugging (RuName is not sensitive)
+    console.log("Using RuName for authorization:", ruName)
+    console.log("RuName length:", ruName?.length)
     
     // Validate that required scopes are present
     // Required scope for listing products:
@@ -63,10 +67,11 @@ export async function GET() {
     
     // Build OAuth URL with properly encoded scopes
     // URLSearchParams will automatically URL-encode the scope parameter
+    // IMPORTANT: redirect_uri must match EXACTLY in both authorization and token exchange
     const ebayAuthUrl = new URL(authBaseUrl)
     ebayAuthUrl.searchParams.set("client_id", process.env.EBAY_CLIENT_ID)
     ebayAuthUrl.searchParams.set("response_type", "code")
-    ebayAuthUrl.searchParams.set("redirect_uri", ruName)
+    ebayAuthUrl.searchParams.set("redirect_uri", ruName) // Must match exactly in token exchange
     // Set scope - URLSearchParams will automatically URL-encode it
     // Scopes should be space-separated in the env var, URLSearchParams will encode them properly
     ebayAuthUrl.searchParams.set("scope", scope)
@@ -74,8 +79,11 @@ export async function GET() {
     ebayAuthUrl.searchParams.set("state", `${session.user.id}-${Date.now()}`) // Use user ID + timestamp as state
     ebayAuthUrl.searchParams.set("prompt", "login") // Force showing login and consent screen
 
-    // Log the final URL for debugging (without sensitive data)
-    console.log("eBay OAuth URL generated:", ebayAuthUrl.toString().replace(/client_id=[^&]+/, "client_id=***"))
+    // Log the final URL for debugging (without sensitive data, but include redirect_uri to verify)
+    const debugUrl = ebayAuthUrl.toString()
+      .replace(/client_id=[^&]+/, "client_id=***")
+    console.log("eBay OAuth URL generated:", debugUrl)
+    console.log("Redirect URI in URL:", ebayAuthUrl.searchParams.get("redirect_uri"))
 
     return NextResponse.redirect(ebayAuthUrl.toString())
   } catch (error) {
