@@ -285,25 +285,13 @@ export async function POST(req: Request) {
       let hint = "Make sure your eBay account has selling privileges and the required permissions."
       let needsReconnect = false
       
-      // Only delete token for specific error codes that indicate scope/permission issues
       // Error 2004 specifically means "OAuth token is missing required scopes"
       if (errorCode === 2004) {
-        // Error 2004: Token missing required scopes - automatically clear the invalid token
-        console.error("Error 2004 detected: Token missing sell.inventory scope. Clearing invalid token.")
+        console.error("Error 2004 detected: Token missing sell.inventory scope.")
         console.error("Full error details:", JSON.stringify(errorData, null, 2))
         console.error("Current EBAY_SCOPE:", process.env.EBAY_SCOPE)
-        
-        try {
-          await prisma.ebayToken.delete({
-            where: { userId: session.user.id }
-          })
-          console.log("Invalid token cleared. User must reconnect with correct scopes.")
-          needsReconnect = true
-          hint = "Error 2004: Your eBay token is missing the 'sell.inventory' scope required for listing. The invalid token has been cleared. Please reconnect your eBay account - you'll be redirected to the connection page. Make sure EBAY_SCOPE includes 'sell.inventory' before reconnecting."
-        } catch (deleteError) {
-          console.error("Failed to clear invalid token:", deleteError)
-          hint = "Error 2004: Your OAuth token is missing the 'sell.inventory' scope. Please disconnect and reconnect your eBay account. Make sure EBAY_SCOPE environment variable includes 'sell.inventory'."
-        }
+        needsReconnect = true
+        hint = "Error 2004: Your eBay token is missing the 'sell.inventory' scope required for listing. Please disconnect and revoke access, then reconnect your eBay account from the eBay Connect page. Make sure EBAY_SCOPE includes 'sell.inventory' before reconnecting."
       } else if (inventoryResponse.status === 401 && errorCode !== 2004) {
         // 401 but not error 2004 - might be token expired or invalid, but don't delete automatically
         console.error("401 Unauthorized but not error 2004. Error code:", errorCode)
@@ -425,24 +413,16 @@ export async function POST(req: Request) {
       const errorData = await offerResponse.json().catch(() => ({}))
       const errorCode = errorData.errors?.[0]?.errorId || errorData.errors?.[0]?.code
       
-      // Only delete token for error 2004 (missing scopes)
       if (errorCode === 2004) {
-        console.error("Error 2004 in offer creation - deleting token")
-        try {
-          await prisma.ebayToken.delete({
-            where: { userId: session.user.id }
-          })
-          return NextResponse.json(
-            { 
-              error: "Your eBay connection needs to be refreshed. Please reconnect your eBay account.",
-              errorCode: 2004,
-              needsReconnect: true
-            },
-            { status: 401 }
-          )
-        } catch (deleteError) {
-          console.error("Failed to delete token:", deleteError)
-        }
+        console.error("Error 2004 in offer creation - token missing required scopes.")
+        return NextResponse.json(
+          { 
+            error: "Your eBay token is missing the required 'sell.inventory' scope for creating offers. Please disconnect and reconnect your eBay account.",
+            errorCode: 2004,
+            needsReconnect: true,
+          },
+          { status: 401 }
+        )
       }
     }
 
@@ -516,24 +496,16 @@ export async function POST(req: Request) {
       const errorData = await publishResponse.json().catch(() => ({}))
       const errorCode = errorData.errors?.[0]?.errorId || errorData.errors?.[0]?.code
       
-      // Only delete token for error 2004 (missing scopes)
       if (errorCode === 2004) {
-        console.error("Error 2004 in publish - deleting token")
-        try {
-          await prisma.ebayToken.delete({
-            where: { userId: session.user.id }
-          })
-          return NextResponse.json(
-            { 
-              error: "Your eBay connection needs to be refreshed. Please reconnect your eBay account.",
-              errorCode: 2004,
-              needsReconnect: true
-            },
-            { status: 401 }
-          )
-        } catch (deleteError) {
-          console.error("Failed to delete token:", deleteError)
-        }
+        console.error("Error 2004 in publish - token missing required scopes.")
+        return NextResponse.json(
+          { 
+            error: "Your eBay token is missing the required 'sell.inventory' scope for publishing listings. Please disconnect and reconnect your eBay account.",
+            errorCode: 2004,
+            needsReconnect: true,
+          },
+          { status: 401 }
+        )
       }
     }
 
