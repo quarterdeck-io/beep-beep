@@ -194,41 +194,19 @@ export default function ProductSearchPage() {
           details: data.details
         })
         
-        // Check if reconnection is needed (only if token was actually deleted)
+        // If the API says we need to reconnect, just surface a clear message
+        // and let the user decide when to disconnect/reconnect.
         if (data.needsReconnect) {
-          // Verify connection status before showing as disconnected
-          try {
-            const checkRes = await fetch("/api/ebay/check-connection")
-            const checkData = await checkRes.json()
-            // Only set as disconnected if token is actually gone
-            if (!checkData.connected) {
-              setIsConnected(false)
-              // Build error message with reconnection instructions
-              let errorMessage = data.error || "eBay connection needs to be refreshed"
-              if (data.hint) {
-                errorMessage = data.hint.replace(/\n/g, " ")
-              }
-              
-              // Special handling for error 2004
-              if (data.errorCode === 2004) {
-                errorMessage = "Error 2004: Your eBay token is missing the 'sell.inventory' scope required for listing products. The account has been disconnected. You'll be redirected to reconnect - make sure to grant all permissions when reconnecting."
-              }
-              
-              setListingError(errorMessage)
-              // Redirect to connect page after a short delay
-              setTimeout(() => {
-                router.push("/ebay-connect")
-              }, 3000) // Give user time to read the error message
-              return
-            } else {
-              // Token still exists, so don't show as disconnected
-              console.log("Token still exists, not disconnecting")
-            }
-          } catch (checkError) {
-            console.error("Failed to check connection status:", checkError)
-            // If check fails, assume disconnected
-            setIsConnected(false)
+          let errorMessage = data.error || "Your eBay connection needs to be refreshed."
+          
+          if (data.errorCode === 2004) {
+            errorMessage = "Error 2004: Your eBay token is missing the 'sell.inventory' scope required for listing products. Please go to the eBay Connect page, disconnect & revoke access, then connect again making sure to grant all requested permissions."
+          } else if (data.hint) {
+            errorMessage = data.hint.replace(/\n/g, " ")
           }
+          
+          setListingError(errorMessage)
+          return
         }
         
         // Build a more detailed error message
@@ -545,7 +523,10 @@ export default function ProductSearchPage() {
     )
   }
 
-  if (!isConnected) {
+  const shouldShowConnectScreen =
+    !isConnected && !productData && !error && !listingError && !listingSuccess
+
+  if (shouldShowConnectScreen) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
         <Navigation />
