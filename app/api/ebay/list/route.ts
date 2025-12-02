@@ -304,6 +304,7 @@ export async function POST(req: Request) {
       'Authorization': `Bearer ${accessToken}`,
       'Content-Type': 'application/json',
       'Content-Language': 'en-US',
+      'Accept-Language': 'en-US',
       'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
     }, null, 2))
     console.log("Body:", JSON.stringify(inventoryItemPayload, null, 2))
@@ -317,6 +318,7 @@ export async function POST(req: Request) {
           'Authorization': `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
           'Content-Language': 'en-US',
+          'Accept-Language': 'en-US',
           'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
         },
         body: JSON.stringify(inventoryItemPayload),
@@ -441,6 +443,7 @@ export async function POST(req: Request) {
                 'Authorization': `Bearer ${accessToken}`,
                 'Content-Type': 'application/json',
                 'Content-Language': 'en-US',
+                'Accept-Language': 'en-US',
                 'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
               },
             }
@@ -466,6 +469,7 @@ export async function POST(req: Request) {
                 'Authorization': `Bearer ${accessToken}`,
                 'Content-Type': 'application/json',
                 'Content-Language': 'en-US',
+                'Accept-Language': 'en-US',
                 'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
               },
             }
@@ -491,6 +495,7 @@ export async function POST(req: Request) {
                 'Authorization': `Bearer ${accessToken}`,
                 'Content-Type': 'application/json',
                 'Content-Language': 'en-US',
+                'Accept-Language': 'en-US',
                 'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
               },
             }
@@ -555,6 +560,7 @@ export async function POST(req: Request) {
       'Authorization': `Bearer ${accessToken}`,
       'Content-Type': 'application/json',
       'Content-Language': 'en-US',
+      'Accept-Language': 'en-US',
       'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
     }, null, 2))
     console.log("Body:", JSON.stringify(offerPayload, null, 2))
@@ -568,6 +574,7 @@ export async function POST(req: Request) {
           'Authorization': `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
           'Content-Language': 'en-US',
+          'Accept-Language': 'en-US',
           'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
         },
         body: JSON.stringify(offerPayload),
@@ -656,6 +663,7 @@ export async function POST(req: Request) {
       'Authorization': `Bearer ${accessToken}`,
       'Content-Type': 'application/json',
       'Content-Language': 'en-US',
+      'Accept-Language': 'en-US',
       'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
     }, null, 2))
     console.log("Body: {} (empty)")
@@ -669,6 +677,7 @@ export async function POST(req: Request) {
           'Authorization': `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
           'Content-Language': 'en-US',
+          'Accept-Language': 'en-US',
           'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
         },
       }
