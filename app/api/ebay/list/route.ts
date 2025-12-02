@@ -42,7 +42,8 @@ export async function POST(req: Request) {
       additionalImages,  // Array of additional image URLs
       itemWebUrl,  // Original eBay listing URL (for reference)
       categories,  // Category information from Browse API
-      conditionId  // Condition ID from Browse API
+      conditionId,  // Condition ID from Browse API
+      shortDescription  // Short description from Browse API (may contain Platform info)
     } = body
 
     // Validate and sanitize required fields
@@ -927,13 +928,15 @@ export async function POST(req: Request) {
                         aspectDefinitionsList.push({
                           name: aspectDef.localizedAspectName || aspectDef.aspectName,
                           required: true,
-                          values: aspectDef.aspectValues?.map((v: any) => v.localizedValue || v.value) || []
+                          values: aspectDef.aspectValues?.map((v: any) => v.localizedValue || v.value) || [],
+                          suggestedValue: extractAspectValue(missingAspect, shortDescription || description || title || "")
                         })
                       } else {
                         aspectDefinitionsList.push({
                           name: missingAspect,
                           required: true,
-                          values: []
+                          values: [],
+                          suggestedValue: extractAspectValue(missingAspect, shortDescription || description || title || "")
                         })
                       }
                     })
@@ -944,7 +947,8 @@ export async function POST(req: Request) {
                     aspectDefinitionsList.push({
                       name: missingAspect,
                       required: true,
-                      values: []
+                      values: [],
+                      suggestedValue: extractAspectValue(missingAspect, shortDescription || description || title || "")
                     })
                   })
                 }
@@ -1208,14 +1212,17 @@ export async function POST(req: Request) {
                   aspectDefinitionsList.push({
                     name: aspectDef.localizedAspectName || aspectDef.aspectName,
                     required: true,
-                    values: aspectDef.aspectValues?.map((v: any) => v.localizedValue || v.value) || []
+                    values: aspectDef.aspectValues?.map((v: any) => v.localizedValue || v.value) || [],
+                    // Try to extract suggested value from shortDescription or title
+                    suggestedValue: extractAspectValue(missingAspect, shortDescription || description || title || "")
                   })
                 } else {
                   // If not found, add a basic definition
                   aspectDefinitionsList.push({
                     name: missingAspect,
                     required: true,
-                    values: []
+                    values: [],
+                    suggestedValue: extractAspectValue(missingAspect, shortDescription || description || title || "")
                   })
                 }
               })
@@ -1227,7 +1234,8 @@ export async function POST(req: Request) {
               aspectDefinitionsList.push({
                 name: missingAspect,
                 required: true,
-                values: []
+                values: [],
+                suggestedValue: extractAspectValue(missingAspect, shortDescription || description || title || "")
               })
             })
           }
@@ -1337,6 +1345,52 @@ export async function POST(req: Request) {
       { status: 500 }
     )
   }
+}
+
+// Helper function to extract aspect value from text (shortDescription, title, etc.)
+function extractAspectValue(aspectName: string, text: string): string | null {
+  if (!text) return null
+  
+  const aspectLower = aspectName.toLowerCase()
+  const textLower = text.toLowerCase()
+  
+  // Try to find "Platform: value" pattern
+  if (aspectLower === "platform") {
+    // Pattern: "Platform: Sony Playstation 5" or "Platform: PlayStation 5"
+    const platformMatch = text.match(/platform:\s*([^.,;]+)/i)
+    if (platformMatch && platformMatch[1]) {
+      return platformMatch[1].trim()
+    }
+    
+    // Try to find in title: "PS5", "PlayStation 5", "Xbox", etc.
+    if (textLower.includes("ps5") || textLower.includes("playstation 5")) {
+      return "PlayStation 5"
+    }
+    if (textLower.includes("ps4") || textLower.includes("playstation 4")) {
+      return "PlayStation 4"
+    }
+    if (textLower.includes("xbox one")) {
+      return "Xbox One"
+    }
+    if (textLower.includes("xbox series")) {
+      return "Xbox Series X|S"
+    }
+    if (textLower.includes("nintendo switch")) {
+      return "Nintendo Switch"
+    }
+    if (textLower.includes("pc") && !textLower.includes("ps")) {
+      return "PC"
+    }
+  }
+  
+  // Generic pattern: "AspectName: value"
+  const genericMatch = new RegExp(`${aspectName}:\\s*([^.,;]+)`, "i")
+  const match = text.match(genericMatch)
+  if (match && match[1]) {
+    return match[1].trim()
+  }
+  
+  return null
 }
 
 // Helper function to map condition to eBay condition enum
