@@ -218,6 +218,9 @@ export default function ProductSearchPage() {
           // Condition ID from Browse API
           conditionId: productData.conditionId || "",
           
+          // Short description (may contain Platform info)
+          shortDescription: productData.shortDescription || "",
+          
           // Reference URL (for debugging/logging)
           itemWebUrl: productData.itemWebUrl || "",
         }),
@@ -235,6 +238,16 @@ export default function ProductSearchPage() {
         if (data.action === "missing_item_specifics" && data.missingItemSpecifics) {
           setMissingAspects(data.missingItemSpecifics)
           setAspectDefinitions(data.aspectDefinitions || [])
+          
+          // Pre-fill form with suggested values if available
+          const prefillAspects: Record<string, string> = {}
+          data.aspectDefinitions?.forEach((def: any) => {
+            if (def.suggestedValue) {
+              prefillAspects[def.name] = def.suggestedValue
+            }
+          })
+          setUserProvidedAspects(prefillAspects)
+          
           setShowAspectForm(true)
           setListingError(null) // Clear error to show form instead
           setListingLoading(false)
