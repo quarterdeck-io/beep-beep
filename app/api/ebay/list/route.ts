@@ -893,23 +893,97 @@ export async function POST(req: Request) {
               const publishErrorParams = publishErrorData.errors?.[0]?.parameters || []
               
               // Extract missing item specific info
-              let missingSpecific = null
+              let missingAspectsList: string[] = []
+              let aspectDefinitionsList: any[] = []
+              
               publishErrorParams.forEach((param: any) => {
-                if (param.name === "2") missingSpecific = param.value
+                if (param.name === "2" && param.value) {
+                  missingAspectsList = [param.value]
+                }
               })
               
+              // If missing aspects found, fetch definitions
+              if (publishErrorCode === 25002 && missingAspectsList.length > 0) {
+                try {
+                  const taxonomyUrl = `${baseUrl}/sell/taxonomy/v1/category_tree/0/get_item_aspects_for_category?category_id=${finalCategoryId}`
+                  const taxonomyResponse = await fetch(taxonomyUrl, {
+                    headers: {
+                      'Authorization': `Bearer ${accessToken}`,
+                      'Content-Type': 'application/json',
+                      'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
+                    },
+                  })
+                  
+                  if (taxonomyResponse.ok) {
+                    const taxonomyData = await taxonomyResponse.json()
+                    const allAspects = taxonomyData.aspects || []
+                    
+                    missingAspectsList.forEach((missingAspect: string) => {
+                      const aspectDef = allAspects.find((a: any) => 
+                        (a.localizedAspectName || a.aspectName) === missingAspect ||
+                        (a.localizedAspectName || a.aspectName)?.toLowerCase() === missingAspect.toLowerCase()
+                      )
+                      if (aspectDef) {
+                        aspectDefinitionsList.push({
+                          name: aspectDef.localizedAspectName || aspectDef.aspectName,
+                          required: true,
+                          values: aspectDef.aspectValues?.map((v: any) => v.localizedValue || v.value) || []
+                        })
+                      } else {
+                        aspectDefinitionsList.push({
+                          name: missingAspect,
+                          required: true,
+                          values: []
+                        })
+                      }
+                    })
+                  }
+                } catch (taxonomyError) {
+                  console.warn("Could not fetch aspect definitions:", taxonomyError)
+                  missingAspectsList.forEach((missingAspect: string) => {
+                    aspectDefinitionsList.push({
+                      name: missingAspect,
+                      required: true,
+                      values: []
+                    })
+                  })
+                }
+              }
+              
               let hint = "Offer updated but not published. "
-              if (publishErrorCode === 25002 && missingSpecific) {
-                hint += `Missing required item specific: "${missingSpecific}". This category requires this attribute to be specified.`
+              if (publishErrorCode === 25002 && missingAspectsList.length > 0) {
+                hint += `Missing required item specific: "${missingAspectsList.join(", ")}". This category requires this attribute to be specified.`
               } else {
                 hint += "You can publish it manually from your eBay Seller Hub."
               }
               
               console.error("Publish updated offer failed:", {
                 errorCode: publishErrorCode,
-                missingSpecific,
+                missingAspectsList,
                 message: publishErrorMessage
               })
+              
+              // Return format that frontend expects for missing item specifics
+              if (publishErrorCode === 25002 && missingAspectsList.length > 0) {
+                return NextResponse.json(
+                  {
+                    error: publishErrorMessage,
+                    action: "missing_item_specifics",
+                    missingItemSpecifics: missingAspectsList,
+                    aspectDefinitions: aspectDefinitionsList,
+                    currentAspects: productObj.aspects || {},
+                    categoryId: finalCategoryId,
+                    hint: hint,
+                    offerId: offerId,
+                    sku: finalSku,
+                    details: publishErrorData,
+                    rawEbayError: publishErrorData,
+                    canRetry: false,
+                    updated: true,
+                  },
+                  { status: publishResponse.status }
+                )
+              }
               
               return NextResponse.json(
                 { 
@@ -918,7 +992,7 @@ export async function POST(req: Request) {
                   offerId: offerId,
                   sku: finalSku,
                   hint: hint,
-                  missingItemSpecific: missingSpecific,
+                  missingItemSpecific: missingAspectsList[0] || null,
                   action: "publish_failed",
                   updated: true,
                 },
@@ -1093,17 +1167,74 @@ export async function POST(req: Request) {
       let specificHint = ""
       
       // Error 25002 can mean missing required item specifics
+      let missingAspectsList: string[] = []
+      let aspectDefinitionsList: any[] = []
+      
       if (errorCode === 25002) {
         // Try to extract the missing specific name from parameters
         errorParameters.forEach((param: any) => {
-          if (param.name === "2" || param.value?.includes("item specific")) {
-            // Parameter with name "2" often contains the missing field name
+          if (param.name === "2") {
+            // Parameter with name "2" contains the missing field name
             missingSpecific = param.value
+            if (missingSpecific) {
+              missingAspectsList = [missingSpecific]
+            }
           }
         })
         
+        // If we found a missing specific, fetch aspect definitions for the form
+        if (missingAspectsList.length > 0) {
+          try {
+            const taxonomyUrl = `${baseUrl}/sell/taxonomy/v1/category_tree/0/get_item_aspects_for_category?category_id=${finalCategoryId}`
+            const taxonomyResponse = await fetch(taxonomyUrl, {
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+                'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
+              },
+            })
+            
+            if (taxonomyResponse.ok) {
+              const taxonomyData = await taxonomyResponse.json()
+              const allAspects = taxonomyData.aspects || []
+              
+              // Get definitions for missing aspects
+              missingAspectsList.forEach((missingAspect: string) => {
+                const aspectDef = allAspects.find((a: any) => 
+                  (a.localizedAspectName || a.aspectName) === missingAspect ||
+                  (a.localizedAspectName || a.aspectName)?.toLowerCase() === missingAspect.toLowerCase()
+                )
+                if (aspectDef) {
+                  aspectDefinitionsList.push({
+                    name: aspectDef.localizedAspectName || aspectDef.aspectName,
+                    required: true,
+                    values: aspectDef.aspectValues?.map((v: any) => v.localizedValue || v.value) || []
+                  })
+                } else {
+                  // If not found, add a basic definition
+                  aspectDefinitionsList.push({
+                    name: missingAspect,
+                    required: true,
+                    values: []
+                  })
+                }
+              })
+            }
+          } catch (taxonomyError) {
+            console.warn("Could not fetch aspect definitions:", taxonomyError)
+            // Add basic definitions anyway
+            missingAspectsList.forEach((missingAspect: string) => {
+              aspectDefinitionsList.push({
+                name: missingAspect,
+                required: true,
+                values: []
+              })
+            })
+          }
+        }
+        
         if (missingSpecific) {
-          specificHint = `The category requires "${missingSpecific}" to be specified. This is a required item specific for this product category. Please ensure the product data includes this information before listing.`
+          specificHint = `The category requires "${missingSpecific}" to be specified. This is a required item specific for this product category. Please provide this information to continue.`
         } else {
           // General missing item specific error
           const errorMsg = errorParameters.find((p: any) => p.name === "0" || p.name === "1")?.value || ""
@@ -1127,8 +1258,30 @@ export async function POST(req: Request) {
         errorCode,
         errorMessage,
         missingSpecific,
+        missingAspectsList,
         parameters: errorParameters
       })
+      
+      // If this is a missing item specifics error, return format that frontend expects
+      if (errorCode === 25002 && missingAspectsList.length > 0) {
+        return NextResponse.json(
+          {
+            error: errorMessage,
+            action: "missing_item_specifics", // Plural to match frontend check
+            missingItemSpecifics: missingAspectsList, // Plural array
+            aspectDefinitions: aspectDefinitionsList,
+            currentAspects: productObj.aspects || {},
+            categoryId: finalCategoryId,
+            hint: hint,
+            offerId: offerId,
+            sku: finalSku,
+            details: errorData,
+            rawEbayError: errorData,
+            canRetry: false,
+          },
+          { status: publishResponse.status }
+        )
+      }
       
       return NextResponse.json(
         { 
@@ -1141,7 +1294,7 @@ export async function POST(req: Request) {
           rawEbayError: errorData,
           ebayErrorMessage: errorData.errors?.[0] || errorData,
           // Provide actionable information
-          action: errorCode === 25002 && missingSpecific ? "missing_item_specific" : "publish_failed",
+          action: "publish_failed",
           canRetry: errorCode !== 25002, // Can't retry if item specifics are missing
         },
         { status: publishResponse.status }
