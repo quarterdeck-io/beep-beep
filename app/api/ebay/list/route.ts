@@ -24,7 +24,7 @@ export async function POST(req: Request) {
       )
     }
 
-    let { title, description, price, condition, imageUrl, categoryId } = body
+    let { title, description, price, condition, imageUrl, categoryId, upc, ean, isbn, mpn, brand, aspects } = body
 
     // Validate and sanitize required fields
     const missingFields: string[] = []
@@ -243,14 +243,6 @@ export async function POST(req: Request) {
     // Increment the counter for next time (we'll update it after successful listing)
 
     // Step 1: Create an inventory item
-    // eBay requires SKU to be provided upfront
-    // Note: eBay Inventory API may require product identifiers or a different structure
-    // For now, we'll try a simpler approach that might work better
-    const inventoryItemPayload: any = {
-      sku: sku,
-      condition: mapConditionToEbay(condition),
-    }
-    
     // Build product object - eBay requires at minimum a title
     const productObj: any = {
       title: title.substring(0, 80), // eBay title limit is 80 characters
@@ -266,20 +258,52 @@ export async function POST(req: Request) {
       productObj.imageUrls = [imageUrl]
     }
     
-    inventoryItemPayload.product = productObj
+    // Add product identifiers (UPC, EAN, ISBN, etc.) if provided
+    if (upc && upc.trim().length > 0) {
+      productObj.upc = [upc.trim()]
+    }
+    if (ean && ean.trim().length > 0) {
+      productObj.ean = [ean.trim()]
+    }
+    if (isbn && isbn.trim().length > 0) {
+      productObj.isbn = [isbn.trim()]
+    }
+    if (mpn && mpn.trim().length > 0) {
+      productObj.mpn = mpn.trim()
+    }
+    if (brand && brand.trim().length > 0) {
+      productObj.brand = brand.trim()
+    }
+    
+    // Add product aspects (category-specific attributes) if provided
+    if (aspects && typeof aspects === 'object' && Object.keys(aspects).length > 0) {
+      productObj.aspects = aspects
+    }
+    
+    // Build inventory payload (SKU is in URL, not body!)
+    const inventoryItemPayload: any = {
+      product: productObj,
+      condition: mapConditionToEbay(condition),
+      availability: {
+        shipToLocationAvailability: {
+          quantity: 1
+        }
+      }
+    }
     
     // Log the payload for debugging
     console.log("Creating inventory item with payload:", JSON.stringify(inventoryItemPayload, null, 2))
     
     // Log complete request details for Postman
-    const inventoryUrl = `${baseUrl}/sell/inventory/v1/inventory_item`
+    const inventoryUrl = `${baseUrl}/sell/inventory/v1/inventory_item/${sku}`
     console.log("=".repeat(80))
     console.log("API CALL #1: CREATE INVENTORY ITEM")
     console.log("URL:", inventoryUrl)
-    console.log("Method: POST")
+    console.log("Method: PUT")
     console.log("Headers:", JSON.stringify({
       'Authorization': `Bearer ${accessToken}`,
       'Content-Type': 'application/json',
+      'Content-Language': 'en-US',
       'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
     }, null, 2))
     console.log("Body:", JSON.stringify(inventoryItemPayload, null, 2))
@@ -288,10 +312,11 @@ export async function POST(req: Request) {
     const inventoryResponse = await fetch(
       inventoryUrl,
       {
-        method: "POST",
+        method: "PUT",
         headers: {
           'Authorization': `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
+          'Content-Language': 'en-US',
           'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
         },
         body: JSON.stringify(inventoryItemPayload),
@@ -305,7 +330,10 @@ export async function POST(req: Request) {
       // Only delete if we get error 2004 specifically
     }
 
-    if (!inventoryResponse.ok) {
+    // Check for 204 No Content (success with no body)
+    if (inventoryResponse.status === 204) {
+      console.log("✅ Inventory item created successfully (204 No Content)")
+    } else if (!inventoryResponse.ok) {
       const errorData = await inventoryResponse.json().catch(() => ({}))
       const errorText = await inventoryResponse.text().catch(() => "")
       
@@ -369,8 +397,12 @@ export async function POST(req: Request) {
       )
     }
 
-    const inventoryData = await inventoryResponse.json()
-    // Use the SKU we provided, or fall back to the one from response
+    // Handle response - 204 returns no body
+    let inventoryData: any = {}
+    if (inventoryResponse.status !== 204) {
+      inventoryData = await inventoryResponse.json().catch(() => ({}))
+    }
+    // Use the SKU we provided (since 204 returns no body)
     const finalSku = inventoryData.sku || sku
 
     // Step 2: Get user's saved policies or fetch from eBay
@@ -397,24 +429,82 @@ export async function POST(req: Request) {
         }
         console.log("Using saved policies:", { fulfillmentPolicyId, paymentPolicyId, returnPolicyId })
       } else {
-        // Fall back to fetching the first available policy from eBay
+        // Fall back to fetching policies from eBay
         console.log("No saved policies found, fetching from eBay...")
-        const policiesResponse = await fetch(
-          `${baseUrl}/sell/account/v1/fulfillment_policy`,
-          {
-            headers: {
-              'Authorization': `Bearer ${accessToken}`,
-              'Content-Type': 'application/json',
-              'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
-            },
-          }
-        )
         
-        if (policiesResponse.ok) {
-          const policiesData = await policiesResponse.json()
-          if (policiesData.fulfillmentPolicies && policiesData.fulfillmentPolicies.length > 0) {
-            fulfillmentPolicyId = policiesData.fulfillmentPolicies[0].fulfillmentPolicyId
+        // Fetch Fulfillment Policy
+        try {
+          const fulfillmentResponse = await fetch(
+            `${baseUrl}/sell/account/v1/fulfillment_policy`,
+            {
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+                'Content-Language': 'en-US',
+                'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
+              },
+            }
+          )
+          
+          if (fulfillmentResponse.ok) {
+            const data = await fulfillmentResponse.json()
+            if (data.fulfillmentPolicies && data.fulfillmentPolicies.length > 0) {
+              fulfillmentPolicyId = data.fulfillmentPolicies[0].fulfillmentPolicyId
+              console.log("Found fulfillment policy:", fulfillmentPolicyId)
+            }
           }
+        } catch (err) {
+          console.error("Failed to fetch fulfillment policy:", err)
+        }
+        
+        // Fetch Payment Policy
+        try {
+          const paymentResponse = await fetch(
+            `${baseUrl}/sell/account/v1/payment_policy`,
+            {
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+                'Content-Language': 'en-US',
+                'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
+              },
+            }
+          )
+          
+          if (paymentResponse.ok) {
+            const data = await paymentResponse.json()
+            if (data.paymentPolicies && data.paymentPolicies.length > 0) {
+              paymentPolicyId = data.paymentPolicies[0].paymentPolicyId
+              console.log("Found payment policy:", paymentPolicyId)
+            }
+          }
+        } catch (err) {
+          console.error("Failed to fetch payment policy:", err)
+        }
+        
+        // Fetch Return Policy
+        try {
+          const returnResponse = await fetch(
+            `${baseUrl}/sell/account/v1/return_policy`,
+            {
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+                'Content-Language': 'en-US',
+                'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
+              },
+            }
+          )
+          
+          if (returnResponse.ok) {
+            const data = await returnResponse.json()
+            if (data.returnPolicies && data.returnPolicies.length > 0) {
+              returnPolicyId = data.returnPolicies[0].returnPolicyId
+              console.log("Found return policy:", returnPolicyId)
+            }
+          }
+        } catch (err) {
+          console.error("Failed to fetch return policy:", err)
         }
       }
     } catch (policyError) {
@@ -464,6 +554,7 @@ export async function POST(req: Request) {
     console.log("Headers:", JSON.stringify({
       'Authorization': `Bearer ${accessToken}`,
       'Content-Type': 'application/json',
+      'Content-Language': 'en-US',
       'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
     }, null, 2))
     console.log("Body:", JSON.stringify(offerPayload, null, 2))
@@ -476,6 +567,7 @@ export async function POST(req: Request) {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
+          'Content-Language': 'en-US',
           'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
         },
         body: JSON.stringify(offerPayload),
@@ -563,6 +655,7 @@ export async function POST(req: Request) {
     console.log("Headers:", JSON.stringify({
       'Authorization': `Bearer ${accessToken}`,
       'Content-Type': 'application/json',
+      'Content-Language': 'en-US',
       'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
     }, null, 2))
     console.log("Body: {} (empty)")
@@ -575,6 +668,7 @@ export async function POST(req: Request) {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
+          'Content-Language': 'en-US',
           'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
         },
       }

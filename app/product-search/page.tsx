@@ -174,6 +174,12 @@ export default function ProductSearchPage() {
           condition: editedCondition || productData.condition || "Brand New",
           imageUrl: productData.image?.imageUrl || "",
           categoryId: productData.categoryId || "",
+          upc: upc || productData.gtin || "", // Pass the scanned UPC
+          ean: productData.ean || "",
+          isbn: productData.isbn || "",
+          mpn: productData.mpn || "",
+          brand: productData.brand || "",
+          aspects: productData.localizedAspects || productData.aspects || null,
         }),
       })
       
