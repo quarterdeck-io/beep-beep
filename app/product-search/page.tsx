@@ -191,39 +191,32 @@ export default function ProductSearchPage() {
           error: data.error,
           errorCode: data.errorCode,
           needsReconnect: data.needsReconnect,
-          details: data.details
+          details: data.details,
+          rawEbayError: data.rawEbayError
         })
         
-        // If the API says we need to reconnect, just surface a clear message
-        // and let the user decide when to disconnect/reconnect.
-        if (data.needsReconnect) {
-          let errorMessage = data.error || "Your eBay connection needs to be refreshed."
-          
-          if (data.errorCode === 2004) {
-            errorMessage = "Error 2004: Your eBay token is missing the 'sell.inventory' scope required for listing products. Please go to the eBay Connect page, disconnect & revoke access, then connect again making sure to grant all requested permissions."
-          } else if (data.hint) {
-            errorMessage = data.hint.replace(/\n/g, " ")
-          }
-          
-          setListingError(errorMessage)
-          return
+        // Display RAW eBay error for debugging
+        let errorMessage = "eBay API Error:\n\n"
+        
+        // Show raw eBay error if available
+        if (data.rawEbayError) {
+          errorMessage += "RAW eBay Response:\n" + JSON.stringify(data.rawEbayError, null, 2) + "\n\n"
         }
         
-        // Build a more detailed error message
-        let errorMessage = data.error || "Failed to list product on eBay"
+        // Show our processed error
+        errorMessage += "Error: " + (data.error || "Failed to list product on eBay") + "\n"
+        
+        if (data.errorCode) {
+          errorMessage += "Error Code: " + data.errorCode + "\n"
+        }
+        
+        if (data.hint) {
+          errorMessage += "Hint: " + data.hint
+        }
         
         // Add received data for debugging if available
         if (data.received) {
           console.error("Received data:", data.received)
-        }
-        
-        if (data.details?.errors?.[0]?.message) {
-          errorMessage += `: ${data.details.errors[0].message}`
-        } else if (data.details?.errors?.[0]?.longMessage) {
-          errorMessage += `: ${data.details.errors[0].longMessage}`
-        }
-        if (data.hint) {
-          errorMessage += ` (${data.hint})`
         }
         if (data.details) {
           console.error("eBay API Error Details:", JSON.stringify(data.details, null, 2))

@@ -85,6 +85,17 @@ export async function POST(req: Request) {
 
     // Check if token is expired and refresh if necessary
     let accessToken = ebayToken.accessToken
+    
+    // Log access token for testing/debugging
+    const isSandbox = process.env.EBAY_SANDBOX === "true"
+    console.log("=".repeat(80))
+    console.log("eBay ACCESS TOKEN FOR POSTMAN TESTING:")
+    console.log("Environment:", isSandbox ? "SANDBOX" : "PRODUCTION")
+    console.log("Access Token:", accessToken)
+    console.log("Token Expires At:", ebayToken.expiresAt)
+    console.log("Token Status:", new Date() >= ebayToken.expiresAt ? "EXPIRED (will refresh)" : "VALID")
+    console.log("=".repeat(80))
+    
     if (new Date() >= ebayToken.expiresAt) {
       // Token is expired, try to refresh
       if (!ebayToken.refreshToken) {
@@ -150,6 +161,13 @@ export async function POST(req: Request) {
 
       const refreshData = await refreshResponse.json()
       accessToken = refreshData.access_token
+      
+      // Log new access token after refresh
+      console.log("=".repeat(80))
+      console.log("eBay TOKEN REFRESHED - NEW ACCESS TOKEN:")
+      console.log("New Access Token:", accessToken)
+      console.log("New Expires At:", new Date(Date.now() + (refreshData.expires_in * 1000)))
+      console.log("=".repeat(80))
 
       // Update token in database
       await prisma.ebayToken.update({
@@ -162,10 +180,18 @@ export async function POST(req: Request) {
       })
     }
 
-    const isSandbox = process.env.EBAY_SANDBOX === "true"
-    const baseUrl = isSandbox
+    const isSandboxEnv = process.env.EBAY_SANDBOX === "true"
+    const baseUrl = isSandboxEnv
       ? "https://api.sandbox.ebay.com"
       : "https://api.ebay.com"
+    
+    // Log API details for Postman testing
+    console.log("=".repeat(80))
+    console.log("eBay API DETAILS FOR POSTMAN:")
+    console.log("Base URL:", baseUrl)
+    console.log("Marketplace:", "EBAY_US")
+    console.log("Current Access Token:", accessToken)
+    console.log("=".repeat(80))
 
     // Get or create SKU settings for the user
     let skuSettings: { nextSkuCounter: number; skuPrefix: string | null } = {
@@ -244,9 +270,23 @@ export async function POST(req: Request) {
     
     // Log the payload for debugging
     console.log("Creating inventory item with payload:", JSON.stringify(inventoryItemPayload, null, 2))
+    
+    // Log complete request details for Postman
+    const inventoryUrl = `${baseUrl}/sell/inventory/v1/inventory_item`
+    console.log("=".repeat(80))
+    console.log("API CALL #1: CREATE INVENTORY ITEM")
+    console.log("URL:", inventoryUrl)
+    console.log("Method: POST")
+    console.log("Headers:", JSON.stringify({
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+      'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
+    }, null, 2))
+    console.log("Body:", JSON.stringify(inventoryItemPayload, null, 2))
+    console.log("=".repeat(80))
 
     const inventoryResponse = await fetch(
-      `${baseUrl}/sell/inventory/v1/inventory_item`,
+      inventoryUrl,
       {
         method: "POST",
         headers: {
@@ -321,7 +361,9 @@ export async function POST(req: Request) {
           errorCode: errorCode,
           details: errorData,
           hint: hint,
-          needsReconnect: needsReconnect
+          needsReconnect: needsReconnect,
+          rawEbayError: errorData, // Full raw error from eBay
+          ebayErrorMessage: errorData.errors?.[0] || errorData // First error or full error object
         },
         { status: inventoryResponse.status }
       )
@@ -404,8 +446,6 @@ export async function POST(req: Request) {
       quantity: 1,
     }
     
-    console.log("Creating offer with payload:", JSON.stringify(offerPayload, null, 2))
-
     // Add listing policies if we have them
     if (fulfillmentPolicyId !== "default" || paymentPolicyId !== "default" || returnPolicyId !== "default") {
       offerPayload.listingPolicies = {
@@ -414,9 +454,23 @@ export async function POST(req: Request) {
         returnPolicyId: returnPolicyId,
       }
     }
+    
+    // Log complete request details for Postman
+    const offerUrl = `${baseUrl}/sell/inventory/v1/offer`
+    console.log("=".repeat(80))
+    console.log("API CALL #2: CREATE OFFER")
+    console.log("URL:", offerUrl)
+    console.log("Method: POST")
+    console.log("Headers:", JSON.stringify({
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+      'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
+    }, null, 2))
+    console.log("Body:", JSON.stringify(offerPayload, null, 2))
+    console.log("=".repeat(80))
 
     const offerResponse = await fetch(
-      `${baseUrl}/sell/inventory/v1/offer`,
+      offerUrl,
       {
         method: "POST",
         headers: {
@@ -479,7 +533,9 @@ export async function POST(req: Request) {
         { 
           error: errorMessage,
           details: errorData,
-          hint: hint
+          hint: hint,
+          rawEbayError: errorData, // Full raw error from eBay
+          ebayErrorMessage: errorData.errors?.[0] || errorData // First error or full error object
         },
         { status: offerResponse.status }
       )
@@ -499,8 +555,21 @@ export async function POST(req: Request) {
     }
 
     // Step 4: Publish the offer
+    const publishUrl = `${baseUrl}/sell/inventory/v1/offer/${offerId}/publish`
+    console.log("=".repeat(80))
+    console.log("API CALL #3: PUBLISH OFFER")
+    console.log("URL:", publishUrl)
+    console.log("Method: POST")
+    console.log("Headers:", JSON.stringify({
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+      'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
+    }, null, 2))
+    console.log("Body: {} (empty)")
+    console.log("=".repeat(80))
+    
     const publishResponse = await fetch(
-      `${baseUrl}/sell/inventory/v1/offer/${offerId}/publish`,
+      publishUrl,
       {
         method: "POST",
         headers: {
@@ -538,7 +607,9 @@ export async function POST(req: Request) {
           error: errorMessage,
           details: errorData,
           offerId: offerId,
-          hint: "Offer created but not published. You can publish it manually from your eBay Seller Hub."
+          hint: "Offer created but not published. You can publish it manually from your eBay Seller Hub.",
+          rawEbayError: errorData, // Full raw error from eBay
+          ebayErrorMessage: errorData.errors?.[0] || errorData // First error or full error object
         },
         { status: publishResponse.status }
       )
