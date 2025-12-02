@@ -67,13 +67,27 @@ export default function SettingsPage() {
           setEbayConnected(data.connected)
           
           if (data.connected) {
-            // Fetch saved policy preferences
-            const policiesRes = await fetch("/api/settings/ebay-policies")
-            if (policiesRes.ok) {
-              const policiesData = await policiesRes.json()
-              setSelectedPaymentPolicy(policiesData.paymentPolicyId || "")
-              setSelectedReturnPolicy(policiesData.returnPolicyId || "")
-              setSelectedFulfillmentPolicy(policiesData.fulfillmentPolicyId || "")
+            // Automatically fetch available policies from eBay
+            setLoadingPolicies(true)
+            try {
+              const policiesRes = await fetch("/api/ebay/policies")
+              if (policiesRes.ok) {
+                const policiesData = await policiesRes.json()
+                setAvailablePolicies(policiesData)
+                
+                // Then fetch saved policy preferences
+                const savedRes = await fetch("/api/settings/ebay-policies")
+                if (savedRes.ok) {
+                  const savedData = await savedRes.json()
+                  setSelectedPaymentPolicy(savedData.paymentPolicyId || "")
+                  setSelectedReturnPolicy(savedData.returnPolicyId || "")
+                  setSelectedFulfillmentPolicy(savedData.fulfillmentPolicyId || "")
+                }
+              }
+            } catch (error) {
+              console.error("Failed to fetch policies:", error)
+            } finally {
+              setLoadingPolicies(false)
             }
           }
         }
@@ -408,22 +422,24 @@ export default function SettingsPage() {
                   Connect eBay Account
                 </a>
               </div>
+            ) : loadingPolicies ? (
+              <div className="text-center py-8">
+                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
+                <p className="text-gray-600 dark:text-gray-400">Loading your eBay policies...</p>
+              </div>
+            ) : !availablePolicies ? (
+              <div className="text-center">
+                <button
+                  onClick={fetchAvailablePolicies}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                >
+                  Load eBay Policies
+                </button>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+                  Click to fetch your available eBay business policies
+                </p>
+              </div>
             ) : (
-              <>
-                {!availablePolicies ? (
-                  <div className="text-center">
-                    <button
-                      onClick={fetchAvailablePolicies}
-                      disabled={loadingPolicies}
-                      className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {loadingPolicies ? "Loading Policies..." : "Load eBay Policies"}
-                    </button>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-                      Click to fetch your available eBay business policies
-                    </p>
-                  </div>
-                ) : (
                   <div className="space-y-6">
                     {/* Payment Policy */}
                     <div>
@@ -492,6 +508,13 @@ export default function SettingsPage() {
                         {savingPolicies ? "Saving..." : "Save Settings"}
                       </button>
                       <button
+                        onClick={fetchAvailablePolicies}
+                        disabled={loadingPolicies}
+                        className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {loadingPolicies ? "Refreshing..." : "Refresh Policies"}
+                      </button>
+                      <button
                         onClick={() => setMessage({ type: "success", text: "You can configure policies later" })}
                         className="px-6 py-2 bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-400 dark:hover:bg-gray-500 transition-colors duration-200"
                       >
@@ -499,8 +522,6 @@ export default function SettingsPage() {
                       </button>
                     </div>
                   </div>
-                )}
-              </>
             )}
           </div>
         </div>

@@ -1,0 +1,239 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*' # Triggers on version tags like v1.0.0, v1.2.3, etc.
+  workflow_dispatch: # Allows manual triggering from GitHub UI
+    inputs:
+      version:
+        description: 'Version to release (e.g., v1.0.0)'
+        required: true
+        default: 'v1.0.0'
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest, ubuntu-latest]
+        node-version: [20]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run linter
+        run: npm run lint
+
+      - name: Run tests
+        run: npm run test
+
+      - name: Run type checking
+        run: npm run typecheck
+
+      - name: Build application
+        run: npm run build
+
+      # macOS build
+      - name: Build macOS app
+        if: matrix.os == 'macos-latest'
+        run: npm run build:mac
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Windows build
+      - name: Build Windows app
+        if: matrix.os == 'windows-latest'
+        run: npm run build:win
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Linux build
+      - name: Build Linux app
+        if: matrix.os == 'ubuntu-latest'
+        run: npm run build:linux
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Upload artifacts for each platform
+      - name: Upload macOS artifacts
+        if: matrix.os == 'macos-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-build
+          path: |
+            dist/*.dmg
+            dist/*.zip
+            dist/latest-mac.yml
+          retention-days: 5
+
+      - name: Upload Windows artifacts
+        if: matrix.os == 'windows-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-build
+          path: |
+            dist/*.exe
+            dist/*.nsis.7z
+            dist/latest.yml
+          retention-days: 5
+
+      - name: Upload Linux artifacts
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-build
+          path: |
+            dist/*.AppImage
+            dist/*.deb
+            dist/*.snap
+            dist/latest-linux.yml
+          retention-days: 5
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+
+      - name: Display structure of downloaded files
+        run: ls -la ./artifacts/
+
+      - name: Get version from tag or input
+        id: get_version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.get_version.outputs.version }}
+          release_name: Release ${{ steps.get_version.outputs.version }}
+          body: |
+            ## Changes in this release
+
+            ### Features
+            - eBay listing automation with UPC scanning
+            - Blu-ray (B-) and DVD (D-) SKU prefixes
+            - Enhanced product search combining catalog and listing data
+            - Automatic offer conflict resolution
+
+            ### Downloads
+            - **Windows**: Download the `.exe` file
+            - **macOS**: Download the `.dmg` file  
+            - **Linux**: Download the `.AppImage`, `.deb`, or `.snap` file
+
+            ### Installation
+            - Windows: Run the installer executable
+            - macOS: Open the DMG and drag the app to Applications
+            - Linux: Make the AppImage executable or install the package
+
+            ---
+            Built with ❤️ using Electron + Vue + TypeScript
+          draft: false
+          prerelease: false
+
+      # Upload macOS files
+      - name: Upload macOS DMG
+        if: always()
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./artifacts/macos-build/eeeeee-bay-1.0.0.dmg
+          asset_name: eeeeee-bay-${{ steps.get_version.outputs.version }}-mac.dmg
+          asset_content_type: application/octet-stream
+        continue-on-error: true
+
+      # Upload Windows files
+      - name: Upload Windows EXE
+        if: always()
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./artifacts/windows-build/eeeeee-bay-1.0.0-setup.exe
+          asset_name: eeeeee-bay-${{ steps.get_version.outputs.version }}-setup.exe
+          asset_content_type: application/octet-stream
+        continue-on-error: true
+
+      # Upload Linux files
+      - name: Upload Linux AppImage
+        if: always()
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./artifacts/linux-build/eeeeee-bay-1.0.0.AppImage
+          asset_name: eeeeee-bay-${{ steps.get_version.outputs.version }.AppImage
+          asset_content_type: application/octet-stream
+        continue-on-error: true
+
+      - name: Upload Linux DEB
+        if: always()
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./artifacts/linux-build/eeeeee-bay_1.0.0_amd64.deb
+          asset_name: eeeeee-bay_${{ steps.get_version.outputs.version }}_amd64.deb
+          asset_content_type: application/vnd.debian.binary-package
+        continue-on-error: true
+
+  # Optional: Create a draft release for manual review
+  draft-release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/')
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+
+      - name: Create Draft Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: draft-${{ github.sha }}
+          release_name: Draft Release - ${{ github.sha }}
+          body: |
+            This is a draft release created from the latest commit.
+            Review the build artifacts before publishing.
+          draft: true
+          prerelease: true
