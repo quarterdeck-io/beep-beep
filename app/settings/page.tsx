@@ -3,6 +3,18 @@
 import Navigation from "@/components/Navigation"
 import { useState, useEffect } from "react"
 
+interface Policy {
+  id: string
+  name: string
+  description?: string
+}
+
+interface EbayPolicies {
+  fulfillmentPolicies: Policy[]
+  paymentPolicies: Policy[]
+  returnPolicies: Policy[]
+}
+
 export default function SettingsPage() {
   const [nextSkuCounter, setNextSkuCounter] = useState<number>(1)
   const [skuPrefix, setSkuPrefix] = useState<string | null>(null)
@@ -14,6 +26,15 @@ export default function SettingsPage() {
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
   const [searchQuery, setSearchQuery] = useState<string>("")
   const [showSearch, setShowSearch] = useState(false)
+
+  // eBay Business Policies state
+  const [availablePolicies, setAvailablePolicies] = useState<EbayPolicies | null>(null)
+  const [loadingPolicies, setLoadingPolicies] = useState(false)
+  const [savingPolicies, setSavingPolicies] = useState(false)
+  const [selectedPaymentPolicy, setSelectedPaymentPolicy] = useState<string>("")
+  const [selectedReturnPolicy, setSelectedReturnPolicy] = useState<string>("")
+  const [selectedFulfillmentPolicy, setSelectedFulfillmentPolicy] = useState<string>("")
+  const [ebayConnected, setEbayConnected] = useState(false)
 
   // Fetch current settings on mount
   useEffect(() => {
@@ -35,6 +56,53 @@ export default function SettingsPage() {
 
     fetchSettings()
   }, [])
+
+  // Check if eBay is connected and fetch saved policies
+  useEffect(() => {
+    const checkEbayConnection = async () => {
+      try {
+        const res = await fetch("/api/ebay/check-connection")
+        if (res.ok) {
+          const data = await res.json()
+          setEbayConnected(data.connected)
+          
+          if (data.connected) {
+            // Fetch saved policy preferences
+            const policiesRes = await fetch("/api/settings/ebay-policies")
+            if (policiesRes.ok) {
+              const policiesData = await policiesRes.json()
+              setSelectedPaymentPolicy(policiesData.paymentPolicyId || "")
+              setSelectedReturnPolicy(policiesData.returnPolicyId || "")
+              setSelectedFulfillmentPolicy(policiesData.fulfillmentPolicyId || "")
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Failed to check eBay connection:", error)
+      }
+    }
+
+    checkEbayConnection()
+  }, [])
+
+  // Fetch available policies when user clicks to load them
+  const fetchAvailablePolicies = async () => {
+    setLoadingPolicies(true)
+    try {
+      const res = await fetch("/api/ebay/policies")
+      if (res.ok) {
+        const data = await res.json()
+        setAvailablePolicies(data)
+      } else {
+        const error = await res.json()
+        setMessage({ type: "error", text: error.error || "Failed to fetch policies" })
+      }
+    } catch (error) {
+      setMessage({ type: "error", text: "Failed to fetch eBay policies" })
+    } finally {
+      setLoadingPolicies(false)
+    }
+  }
 
   const handleSaveCounter = async () => {
     if (!initialSkuInput || initialSkuInput.trim() === "") {
@@ -103,6 +171,46 @@ export default function SettingsPage() {
       setMessage({ type: "error", text: "Failed to save prefix" })
     } finally {
       setSavingPrefix(false)
+    }
+  }
+
+  const handleSavePolicies = async () => {
+    setSavingPolicies(true)
+    setMessage(null)
+
+    try {
+      // Find the selected policy names
+      const paymentPolicy = availablePolicies?.paymentPolicies.find(p => p.id === selectedPaymentPolicy)
+      const returnPolicy = availablePolicies?.returnPolicies.find(p => p.id === selectedReturnPolicy)
+      const fulfillmentPolicy = availablePolicies?.fulfillmentPolicies.find(p => p.id === selectedFulfillmentPolicy)
+
+      const res = await fetch("/api/settings/ebay-policies", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          paymentPolicyId: selectedPaymentPolicy || null,
+          paymentPolicyName: paymentPolicy?.name || null,
+          returnPolicyId: selectedReturnPolicy || null,
+          returnPolicyName: returnPolicy?.name || null,
+          fulfillmentPolicyId: selectedFulfillmentPolicy || null,
+          fulfillmentPolicyName: fulfillmentPolicy?.name || null,
+        }),
+      })
+
+      const data = await res.json()
+
+      if (res.ok) {
+        setMessage({ type: "success", text: "✓ eBay policies configured successfully" })
+      } else {
+        const errorMsg = data.details ? `${data.error}: ${data.details}` : (data.error || "Failed to save policies")
+        setMessage({ type: "error", text: errorMsg })
+      }
+    } catch (error) {
+      setMessage({ type: "error", text: "Failed to save eBay policies" })
+    } finally {
+      setSavingPolicies(false)
     }
   }
 
@@ -277,6 +385,123 @@ export default function SettingsPage() {
                 Optional: Override the automatic SKU prefix detection. Leave empty to use auto-detection.
               </p>
             </div>
+          </div>
+
+          {/* eBay Business Policies Card */}
+          <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6 mt-6">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+              eBay Business Policies
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+              Configure your eBay business policies. These policies define payment, return, and shipping terms for your listings.
+            </p>
+
+            {!ebayConnected ? (
+              <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                <p className="text-yellow-800 dark:text-yellow-300">
+                  Please connect your eBay account first to configure business policies.
+                </p>
+                <a
+                  href="/ebay-connect"
+                  className="inline-block mt-3 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                >
+                  Connect eBay Account
+                </a>
+              </div>
+            ) : (
+              <>
+                {!availablePolicies ? (
+                  <div className="text-center">
+                    <button
+                      onClick={fetchAvailablePolicies}
+                      disabled={loadingPolicies}
+                      className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {loadingPolicies ? "Loading Policies..." : "Load eBay Policies"}
+                    </button>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+                      Click to fetch your available eBay business policies
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {/* Payment Policy */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-900 dark:text-white mb-2">
+                        Payment Policy:
+                      </label>
+                      <select
+                        value={selectedPaymentPolicy}
+                        onChange={(e) => setSelectedPaymentPolicy(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="">Select a Payment Policy</option>
+                        {availablePolicies.paymentPolicies.map((policy) => (
+                          <option key={policy.id} value={policy.id}>
+                            {policy.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Return Policy */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-900 dark:text-white mb-2">
+                        Return Policy:
+                      </label>
+                      <select
+                        value={selectedReturnPolicy}
+                        onChange={(e) => setSelectedReturnPolicy(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="">Select a Return Policy</option>
+                        {availablePolicies.returnPolicies.map((policy) => (
+                          <option key={policy.id} value={policy.id}>
+                            {policy.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Fulfillment Policy */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-900 dark:text-white mb-2">
+                        Fulfillment Policy:
+                      </label>
+                      <select
+                        value={selectedFulfillmentPolicy}
+                        onChange={(e) => setSelectedFulfillmentPolicy(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="">Select a Fulfillment Policy</option>
+                        {availablePolicies.fulfillmentPolicies.map((policy) => (
+                          <option key={policy.id} value={policy.id}>
+                            {policy.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex gap-3 pt-4">
+                      <button
+                        onClick={handleSavePolicies}
+                        disabled={savingPolicies}
+                        className="px-6 py-2 bg-gray-800 dark:bg-gray-700 text-white rounded-md hover:bg-gray-700 dark:hover:bg-gray-600 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {savingPolicies ? "Saving..." : "Save Settings"}
+                      </button>
+                      <button
+                        onClick={() => setMessage({ type: "success", text: "You can configure policies later" })}
+                        className="px-6 py-2 bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-400 dark:hover:bg-gray-500 transition-colors duration-200"
+                      >
+                        Skip for Now
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </div>
       </div>

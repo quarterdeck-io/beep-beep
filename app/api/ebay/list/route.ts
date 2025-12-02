@@ -331,31 +331,52 @@ export async function POST(req: Request) {
     // Use the SKU we provided, or fall back to the one from response
     const finalSku = inventoryData.sku || sku
 
-    // Step 2: Try to get user's policies (optional - eBay may use defaults)
+    // Step 2: Get user's saved policies or fetch from eBay
     let fulfillmentPolicyId = "default"
     let paymentPolicyId = "default"
     let returnPolicyId = "default"
     
     try {
-      // Try to get the first available policy
-      const policiesResponse = await fetch(
-        `${baseUrl}/sell/account/v1/fulfillment_policy`,
-        {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
-            'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
-          },
+      // First, try to get user's saved policy preferences from database
+      const savedPolicies = await (prisma as any).ebayBusinessPolicies.findUnique({
+        where: { userId: session.user.id }
+      })
+
+      if (savedPolicies) {
+        // Use saved policies if available
+        if (savedPolicies.fulfillmentPolicyId) {
+          fulfillmentPolicyId = savedPolicies.fulfillmentPolicyId
         }
-      )
-      
-      if (policiesResponse.ok) {
-        const policiesData = await policiesResponse.json()
-        if (policiesData.fulfillmentPolicies && policiesData.fulfillmentPolicies.length > 0) {
-          fulfillmentPolicyId = policiesData.fulfillmentPolicies[0].fulfillmentPolicyId
+        if (savedPolicies.paymentPolicyId) {
+          paymentPolicyId = savedPolicies.paymentPolicyId
+        }
+        if (savedPolicies.returnPolicyId) {
+          returnPolicyId = savedPolicies.returnPolicyId
+        }
+        console.log("Using saved policies:", { fulfillmentPolicyId, paymentPolicyId, returnPolicyId })
+      } else {
+        // Fall back to fetching the first available policy from eBay
+        console.log("No saved policies found, fetching from eBay...")
+        const policiesResponse = await fetch(
+          `${baseUrl}/sell/account/v1/fulfillment_policy`,
+          {
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+              'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
+            },
+          }
+        )
+        
+        if (policiesResponse.ok) {
+          const policiesData = await policiesResponse.json()
+          if (policiesData.fulfillmentPolicies && policiesData.fulfillmentPolicies.length > 0) {
+            fulfillmentPolicyId = policiesData.fulfillmentPolicies[0].fulfillmentPolicyId
+          }
         }
       }
     } catch (policyError) {
+      console.error("Error fetching policies:", policyError)
       // Use defaults if policy fetch fails
     }
 
