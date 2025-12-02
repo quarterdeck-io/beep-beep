@@ -327,9 +327,45 @@ export async function POST(req: Request) {
     }
     
     // Add product aspects (category-specific attributes) if provided
+    // Convert Browse API aspects format to Inventory API format if needed
+    let formattedAspects: any = null
     if (aspects && typeof aspects === 'object' && Object.keys(aspects).length > 0) {
-      productObj.aspects = aspects
-      console.log("Product aspects included:", Object.keys(aspects).join(", "))
+      formattedAspects = {}
+      
+      // Handle both Browse API format (localizedAspects) and direct aspects
+      if (Array.isArray(aspects)) {
+        // Browse API format: array of {name, value} objects
+        aspects.forEach((aspect: any) => {
+          if (aspect.name && aspect.value) {
+            // Ensure values are arrays
+            formattedAspects[aspect.name] = Array.isArray(aspect.value) ? aspect.value : [aspect.value]
+          }
+        })
+      } else {
+        // Already in correct format: {Brand: ["Sony"], Model: ["PS5"]}
+        formattedAspects = aspects
+      }
+      
+      // Ensure Brand is included (required for most categories)
+      if (!formattedAspects.Brand && brand && brand.trim().length > 0) {
+        formattedAspects.Brand = [brand.trim()]
+        console.log("Added Brand to aspects from product data")
+      }
+      
+      // Ensure MPN is included if available (required for some categories)
+      if (!formattedAspects.MPN && !formattedAspects["Manufacturer Part Number"] && mpn && mpn.trim().length > 0) {
+        formattedAspects.MPN = [mpn.trim()]
+        console.log("Added MPN to aspects from product data")
+      }
+      
+      productObj.aspects = formattedAspects
+      console.log("Product aspects included:", Object.keys(formattedAspects).join(", "))
+    } else if (brand && brand.trim().length > 0) {
+      // If no aspects provided but we have brand, include it
+      productObj.aspects = {
+        Brand: [brand.trim()]
+      }
+      console.log("Created aspects with Brand from product data")
     }
     
     // Build inventory payload (SKU is in URL, not body!)
@@ -668,7 +704,10 @@ export async function POST(req: Request) {
       includeCatalogProductDetails: offerPayload.includeCatalogProductDetails,
       categoryId: finalCategoryId,
       hasEpid: !!epid,
-      imageCount: allImages.length
+      imageCount: allImages.length,
+      hasAspects: !!productObj.aspects,
+      aspectsCount: productObj.aspects ? Object.keys(productObj.aspects).length : 0,
+      aspects: productObj.aspects ? Object.keys(productObj.aspects) : []
     })
     
     // Log complete request details for Postman
@@ -775,12 +814,38 @@ export async function POST(req: Request) {
             if (!publishResponse.ok) {
               const publishErrorData = await publishResponse.json().catch(() => ({}))
               const publishErrorMessage = publishErrorData.errors?.[0]?.message || "Failed to publish existing offer"
+              const publishErrorCode = publishErrorData.errors?.[0]?.errorId
+              const publishErrorParams = publishErrorData.errors?.[0]?.parameters || []
+              
+              // Extract missing item specific info
+              let missingSpecific = null
+              publishErrorParams.forEach((param: any) => {
+                if (param.name === "2") missingSpecific = param.value
+              })
+              
+              let hint = "Offer updated but not published. "
+              if (publishErrorCode === 25002 && missingSpecific) {
+                hint += `Missing required item specific: "${missingSpecific}". This category requires this attribute to be specified.`
+              } else {
+                hint += "You can publish it manually from your eBay Seller Hub."
+              }
+              
+              console.error("Publish updated offer failed:", {
+                errorCode: publishErrorCode,
+                missingSpecific,
+                message: publishErrorMessage
+              })
+              
               return NextResponse.json(
                 { 
                   error: publishErrorMessage,
                   details: publishErrorData,
                   offerId: offerId,
-                  hint: "Offer updated but not published. You can publish it manually from your eBay Seller Hub.",
+                  sku: finalSku,
+                  hint: hint,
+                  missingItemSpecific: missingSpecific,
+                  action: "publish_failed",
+                  updated: true,
                 },
                 { status: publishResponse.status }
               )
@@ -880,6 +945,20 @@ export async function POST(req: Request) {
     }
 
     // Step 5: Publish the offer
+    // Log what we're attempting to publish
+    console.log("=".repeat(80))
+    console.log("PREPARING TO PUBLISH OFFER")
+    console.log("Offer ID:", offerId)
+    console.log("SKU:", finalSku)
+    console.log("Category:", finalCategoryId)
+    console.log("Has Product Aspects:", !!productObj.aspects)
+    if (productObj.aspects) {
+      console.log("Product Aspects:", JSON.stringify(productObj.aspects, null, 2))
+    }
+    console.log("Has Business Policies:", !!(fulfillmentPolicyId !== "default" && paymentPolicyId !== "default" && returnPolicyId !== "default"))
+    console.log("Merchant Location Key:", merchantLocationKey)
+    console.log("=".repeat(80))
+    
     const publishUrl = `${baseUrl}/sell/inventory/v1/offer/${offerId}/publish`
     console.log("=".repeat(80))
     console.log("API CALL #5: PUBLISH OFFER")
@@ -931,14 +1010,64 @@ export async function POST(req: Request) {
     if (!publishResponse.ok) {
       const errorData = await publishResponse.json().catch(() => ({}))
       const errorMessage = errorData.errors?.[0]?.message || errorData.errors?.[0]?.longMessage || "Failed to publish listing"
+      const errorCode = errorData.errors?.[0]?.errorId
+      const errorParameters = errorData.errors?.[0]?.parameters || []
+      
+      // Extract missing item specific from error if available
+      let missingSpecific = null
+      let specificHint = ""
+      
+      // Error 25002 can mean missing required item specifics
+      if (errorCode === 25002) {
+        // Try to extract the missing specific name from parameters
+        errorParameters.forEach((param: any) => {
+          if (param.name === "2" || param.value?.includes("item specific")) {
+            // Parameter with name "2" often contains the missing field name
+            missingSpecific = param.value
+          }
+        })
+        
+        if (missingSpecific) {
+          specificHint = `The category requires "${missingSpecific}" to be specified. This is a required item specific for this product category. Please ensure the product data includes this information before listing.`
+        } else {
+          // General missing item specific error
+          const errorMsg = errorParameters.find((p: any) => p.name === "0" || p.name === "1")?.value || ""
+          if (errorMsg.includes("item specific")) {
+            specificHint = "This product category requires specific item attributes that are missing. Common required attributes include: Brand, Model, Platform (for video games), Size (for clothing), Color, etc. Make sure the product search returns complete data with all required attributes."
+          }
+        }
+      }
+      
+      // Build comprehensive error response
+      let hint = specificHint || "Offer created but not published. You can publish it manually from your eBay Seller Hub."
+      
+      // Additional hints based on error patterns
+      if (errorMessage.includes("policy") || errorMessage.includes("Policy")) {
+        hint = "Missing or invalid business policies. Please verify your payment, return, and fulfillment policies are set up correctly in eBay Seller Hub."
+      } else if (errorMessage.includes("location")) {
+        hint = "Invalid or missing inventory location. Please set up your inventory location in eBay Seller Hub first."
+      }
+      
+      console.error("Publish failed:", {
+        errorCode,
+        errorMessage,
+        missingSpecific,
+        parameters: errorParameters
+      })
+      
       return NextResponse.json(
         { 
           error: errorMessage,
           details: errorData,
           offerId: offerId,
-          hint: "Offer created but not published. You can publish it manually from your eBay Seller Hub.",
-          rawEbayError: errorData, // Full raw error from eBay
-          ebayErrorMessage: errorData.errors?.[0] || errorData // First error or full error object
+          sku: finalSku,
+          hint: hint,
+          missingItemSpecific: missingSpecific,
+          rawEbayError: errorData,
+          ebayErrorMessage: errorData.errors?.[0] || errorData,
+          // Provide actionable information
+          action: errorCode === 25002 && missingSpecific ? "missing_item_specific" : "publish_failed",
+          canRetry: errorCode !== 25002, // Can't retry if item specifics are missing
         },
         { status: publishResponse.status }
       )
