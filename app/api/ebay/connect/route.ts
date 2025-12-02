@@ -29,11 +29,14 @@ export async function GET() {
     console.log("RuName length:", ruName?.length)
     
     // Validate that required scopes are present
-    // Required scope for listing products:
-    // - sell.inventory (create/update inventory items) - REQUIRED
-    // Optional but recommended:
-    // - sell.inventory.readonly (read inventory)
-    // - https://api.ebay.com/oauth/api_scope (for browsing/searching)
+    // eBay OAuth Scopes requested (shown on authorization page):
+    // 1. https://api.ebay.com/oauth/api_scope - View public data from eBay
+    // 2. sell.inventory.readonly - View your inventory and offers
+    // 3. sell.inventory - View and manage your inventory and offers (REQUIRED)
+    // 4. sell.marketing.readonly - View your eBay marketing activities
+    // 5. sell.marketing - View and manage your eBay marketing activities
+    // 6. sell.account.readonly - View your account settings
+    // 7. sell.account - View and manage your account settings
     const requiredScopes = [
       "sell.inventory"  // This is the minimum required for listing
     ]
