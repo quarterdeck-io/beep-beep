@@ -407,7 +407,53 @@ export async function POST(req: Request) {
     // Use the SKU we provided (since 204 returns no body)
     const finalSku = inventoryData.sku || sku
 
-    // Step 2: Get user's saved policies or fetch from eBay
+    // Step 2: Get user's inventory location (required for publishing)
+    let merchantLocationKey = ""
+    
+    try {
+      console.log("Fetching inventory locations...")
+      const locationsResponse = await fetch(
+        `${baseUrl}/sell/inventory/v1/location`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+            'Content-Language': 'en-US',
+            'Accept-Language': 'en-US',
+            'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
+          },
+        }
+      )
+      
+      if (locationsResponse.ok) {
+        const locationsData = await locationsResponse.json()
+        if (locationsData.locations && locationsData.locations.length > 0) {
+          merchantLocationKey = locationsData.locations[0].merchantLocationKey
+          console.log("Found inventory location:", merchantLocationKey)
+        } else {
+          console.warn("No inventory locations found for user")
+        }
+      } else {
+        console.error("Failed to fetch inventory locations:", locationsResponse.status)
+      }
+    } catch (locationError) {
+      console.error("Error fetching inventory locations:", locationError)
+    }
+    
+    // If no location found, we cannot publish the listing
+    if (!merchantLocationKey || merchantLocationKey === "") {
+      return NextResponse.json(
+        { 
+          error: "No inventory location found. Please set up your inventory location in eBay Seller Hub first.",
+          hint: "Go to eBay Seller Hub → Account → Business Policies → Locations and create a location with your address.",
+          needsSetup: true,
+          setupUrl: "https://www.ebay.com/sh/locationsettings"
+        },
+        { status: 400 }
+      )
+    }
+
+    // Step 3: Get user's saved policies or fetch from eBay
     let fulfillmentPolicyId = "default"
     let paymentPolicyId = "default"
     let returnPolicyId = "default"
@@ -517,7 +563,7 @@ export async function POST(req: Request) {
       // Use defaults if policy fetch fails
     }
 
-    // Step 3: Create an offer
+    // Step 4: Create an offer
     // Use a valid category ID - 267 is Movies & TV, but let's try to get a better one
     // If no categoryId provided, use a common default based on product type
     let finalCategoryId = categoryId
@@ -539,6 +585,7 @@ export async function POST(req: Request) {
       },
       categoryId: finalCategoryId,
       quantity: 1,
+      merchantLocationKey: merchantLocationKey, // Required for publishing
     }
     
     // Add listing policies if we have them
@@ -553,7 +600,7 @@ export async function POST(req: Request) {
     // Log complete request details for Postman
     const offerUrl = `${baseUrl}/sell/inventory/v1/offer`
     console.log("=".repeat(80))
-    console.log("API CALL #2: CREATE OFFER")
+    console.log("API CALL #4: CREATE OFFER")
     console.log("URL:", offerUrl)
     console.log("Method: POST")
     console.log("Headers:", JSON.stringify({
@@ -653,10 +700,10 @@ export async function POST(req: Request) {
       )
     }
 
-    // Step 4: Publish the offer
+    // Step 5: Publish the offer
     const publishUrl = `${baseUrl}/sell/inventory/v1/offer/${offerId}/publish`
     console.log("=".repeat(80))
-    console.log("API CALL #3: PUBLISH OFFER")
+    console.log("API CALL #5: PUBLISH OFFER")
     console.log("URL:", publishUrl)
     console.log("Method: POST")
     console.log("Headers:", JSON.stringify({
