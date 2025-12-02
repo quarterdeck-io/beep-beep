@@ -83,9 +83,29 @@ export default function SettingsPage() {
                   setSelectedReturnPolicy(savedData.returnPolicyId || "")
                   setSelectedFulfillmentPolicy(savedData.fulfillmentPolicyId || "")
                 }
+              } else {
+                // Handle error response
+                const errorData = await policiesRes.json()
+                console.error("Error fetching policies:", errorData)
+                
+                if (errorData.needsReconnect) {
+                  setMessage({ 
+                    type: "error", 
+                    text: `${errorData.error} Please disconnect and reconnect your eBay account to grant the required permissions.`
+                  })
+                } else {
+                  setMessage({ 
+                    type: "error", 
+                    text: errorData.error || "Failed to fetch eBay policies. Please try again."
+                  })
+                }
               }
             } catch (error) {
               console.error("Failed to fetch policies:", error)
+              setMessage({ 
+                type: "error", 
+                text: "Failed to load eBay policies. Please refresh the page or try again."
+              })
             } finally {
               setLoadingPolicies(false)
             }
@@ -102,17 +122,50 @@ export default function SettingsPage() {
   // Fetch available policies when user clicks to load them
   const fetchAvailablePolicies = async () => {
     setLoadingPolicies(true)
+    setMessage(null) // Clear any previous messages
+
     try {
       const res = await fetch("/api/ebay/policies")
       if (res.ok) {
         const data = await res.json()
         setAvailablePolicies(data)
+        
+        // Check if policies are empty
+        const totalPolicies = 
+          (data.fulfillmentPolicies?.length || 0) + 
+          (data.paymentPolicies?.length || 0) + 
+          (data.returnPolicies?.length || 0)
+        
+        if (totalPolicies === 0) {
+          setMessage({ 
+            type: "error", 
+            text: "No policies found. Please create business policies in your eBay account settings first."
+          })
+        } else {
+          setMessage({ 
+            type: "success", 
+            text: `✓ Loaded ${totalPolicies} policies from eBay`
+          })
+        }
       } else {
-        const error = await res.json()
-        setMessage({ type: "error", text: error.error || "Failed to fetch policies" })
+        const errorData = await res.json()
+        console.error("Error fetching policies:", errorData)
+        
+        if (errorData.needsReconnect) {
+          setMessage({ 
+            type: "error", 
+            text: `${errorData.error} Click below to reconnect.`
+          })
+        } else {
+          setMessage({ 
+            type: "error", 
+            text: errorData.error || "Failed to fetch policies. Please try again."
+          })
+        }
       }
     } catch (error) {
-      setMessage({ type: "error", text: "Failed to fetch eBay policies" })
+      console.error("Failed to fetch policies:", error)
+      setMessage({ type: "error", text: "Failed to fetch eBay policies. Please check your connection." })
     } finally {
       setLoadingPolicies(false)
     }
@@ -322,7 +375,23 @@ export default function SettingsPage() {
                   : "bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-300"
               }`}
             >
-              {message.text}
+              <p>{message.text}</p>
+              {message.type === "error" && message.text.includes("reconnect") && (
+                <div className="mt-3 flex gap-3">
+                  <a
+                    href="/api/ebay/disconnect"
+                    className="inline-block px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors text-sm"
+                  >
+                    Disconnect eBay
+                  </a>
+                  <a
+                    href="/ebay-connect"
+                    className="inline-block px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm"
+                  >
+                    Reconnect with New Permissions
+                  </a>
+                </div>
+              )}
             </div>
           )}
 
