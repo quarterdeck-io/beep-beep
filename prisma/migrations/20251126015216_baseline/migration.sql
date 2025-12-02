@@ -1,3 +1,0 @@
--- Empty migration: Tables already exist in production database
--- This migration is here to resolve the failed migration state
--- No SQL needed as tables were created in a previous deployment
