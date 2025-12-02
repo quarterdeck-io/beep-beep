@@ -362,10 +362,103 @@ export async function POST(req: Request) {
       console.log("Product aspects included:", Object.keys(formattedAspects).join(", "))
     } else if (brand && brand.trim().length > 0) {
       // If no aspects provided but we have brand, include it
-      productObj.aspects = {
+      formattedAspects = {
         Brand: [brand.trim()]
       }
+      productObj.aspects = formattedAspects
       console.log("Created aspects with Brand from product data")
+    }
+    
+    // Determine final category ID before validation
+    let finalCategoryId = categoryId
+    if (!finalCategoryId && categories && Array.isArray(categories) && categories.length > 0) {
+      const primaryCategory = categories[0]
+      if (primaryCategory && primaryCategory.categoryId) {
+        finalCategoryId = primaryCategory.categoryId
+        console.log("Using category from Browse API:", primaryCategory.categoryName || primaryCategory.categoryId)
+      }
+    }
+    if (!finalCategoryId || finalCategoryId === "") {
+      finalCategoryId = "267"
+      console.warn("No category provided, using default category 267 (Movies & TV)")
+    }
+    
+    // Validate required aspects BEFORE creating inventory item (prevent error 25002)
+    try {
+      const validationUrl = `${baseUrl}/sell/taxonomy/v1/category_tree/0/get_item_aspects_for_category?category_id=${finalCategoryId}`
+      const validationResponse = await fetch(validationUrl, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+          'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
+        },
+      })
+      
+      if (validationResponse.ok) {
+        const validationData = await validationResponse.json()
+        const requiredAspects: string[] = []
+        const aspectDefinitions = validationData.aspects || []
+        
+        aspectDefinitions.forEach((aspect: any) => {
+          if (aspect.aspectConstraint?.aspectRequired === true) {
+            requiredAspects.push(aspect.localizedAspectName || aspect.aspectName)
+          }
+        })
+        
+        // Check if we have all required aspects
+        const currentAspectKeys = formattedAspects ? Object.keys(formattedAspects).map(k => k.toLowerCase()) : []
+        const missingAspects: string[] = []
+        
+        requiredAspects.forEach((requiredAspect: string) => {
+          const aspectKey = requiredAspect.toLowerCase()
+          const hasAspect = currentAspectKeys.some(key => 
+            key === aspectKey || 
+            key.includes(aspectKey) || 
+            aspectKey.includes(key)
+          )
+          
+          if (!hasAspect) {
+            missingAspects.push(requiredAspect)
+          } else {
+            // Check if aspect has values
+            const aspectKeyMatch = Object.keys(formattedAspects || {}).find(k => k.toLowerCase() === aspectKey)
+            const aspectValues = aspectKeyMatch ? formattedAspects[aspectKeyMatch] : null
+            if (!aspectValues || (Array.isArray(aspectValues) && aspectValues.length === 0)) {
+              missingAspects.push(requiredAspect)
+            }
+          }
+        })
+        
+        if (missingAspects.length > 0) {
+          console.warn("Missing required aspects detected:", missingAspects)
+          return NextResponse.json(
+            {
+              error: `Missing required item specifics for this category`,
+              missingItemSpecifics: missingAspects,
+              requiredAspects: requiredAspects,
+              currentAspects: formattedAspects || {},
+              categoryId: finalCategoryId,
+              hint: `This category requires the following item specifics: ${missingAspects.join(", ")}. Please provide these details before listing.`,
+              action: "missing_item_specifics",
+              canRetry: false,
+              // Provide aspect definitions for UI
+              aspectDefinitions: aspectDefinitions
+                .filter((a: any) => a.aspectConstraint?.aspectRequired === true)
+                .map((a: any) => ({
+                  name: a.localizedAspectName || a.aspectName,
+                  required: true,
+                  values: a.aspectValues?.map((v: any) => v.localizedValue || v.value) || []
+                }))
+            },
+            { status: 400 }
+          )
+        }
+        
+        console.log("✅ All required aspects validated:", requiredAspects)
+      }
+    } catch (validationError) {
+      // If validation fails, log but continue (don't block listing)
+      console.warn("Could not validate aspects (continuing anyway):", validationError)
     }
     
     // Build inventory payload (SKU is in URL, not body!)
@@ -652,25 +745,7 @@ export async function POST(req: Request) {
     }
 
     // Step 4: Create an offer
-    // Try to get category from Browse API data first, then fallback
-    let finalCategoryId = categoryId
-    
-    // If we have categories array from Browse API, use the primary category
-    if (!finalCategoryId && categories && Array.isArray(categories) && categories.length > 0) {
-      // Browse API returns categories with categoryId
-      const primaryCategory = categories[0]
-      if (primaryCategory && primaryCategory.categoryId) {
-        finalCategoryId = primaryCategory.categoryId
-        console.log("Using category from Browse API:", primaryCategory.categoryName || primaryCategory.categoryId)
-      }
-    }
-    
-    // If still no category, use default
-    if (!finalCategoryId || finalCategoryId === "") {
-      // Default to Movies & TV category (267) - common for DVDs/Blu-rays
-      finalCategoryId = "267"
-      console.warn("No category provided, using default category 267 (Movies & TV)")
-    }
+    // finalCategoryId is already determined during validation above
     
     const offerPayload: any = {
       sku: finalSku,
