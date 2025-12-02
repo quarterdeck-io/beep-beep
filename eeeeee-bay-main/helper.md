@@ -1,2 +1,0 @@
-Ngrok authtoken
-35Ti9lfGrlxDmubaMpHTF4hugaE_273g79uD4CTVgTCb55gtG
