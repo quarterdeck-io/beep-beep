@@ -26,6 +26,52 @@ export async function GET() {
       )
     }
 
+    // Log user and token info for debugging
+    console.log("=== eBay Connection Info ===")
+    console.log("App User ID:", session.user.id)
+    console.log("App User Email:", session.user.email)
+    console.log("Token Expires At:", ebayToken.expiresAt)
+    console.log("Token Expired:", new Date() > ebayToken.expiresAt)
+    console.log("Has Refresh Token:", !!ebayToken.refreshToken)
+    
+    // ⚠️ SECURITY WARNING: Showing full token for debugging only!
+    // Remove or comment out before deploying to production!
+    console.log("Access Token (FULL - FOR DEBUGGING ONLY):", ebayToken.accessToken)
+    if (ebayToken.refreshToken) {
+      console.log("Refresh Token (FULL - FOR DEBUGGING ONLY):", ebayToken.refreshToken)
+    }
+    
+    // Decode eBay token to see user info and scopes
+    try {
+      // eBay tokens are not JWTs, but we can use the introspection API or just show what we know
+      // For now, let's try to get user info from eBay
+      const userInfoUrl = process.env.EBAY_SANDBOX === "true"
+        ? "https://apiz.sandbox.ebay.com/commerce/identity/v1/user/"
+        : "https://apiz.ebay.com/commerce/identity/v1/user/"
+      
+      console.log("Fetching eBay user info...")
+      const userResponse = await fetch(userInfoUrl, {
+        headers: {
+          'Authorization': `Bearer ${ebayToken.accessToken}`,
+          'Content-Type': 'application/json',
+        },
+      })
+      
+      if (userResponse.ok) {
+        const userData = await userResponse.json()
+        console.log("eBay User Info:", {
+          username: userData.username,
+          userId: userData.userId,
+          email: userData.email || 'N/A',
+        })
+      } else {
+        console.log("Could not fetch eBay user info (this is normal), status:", userResponse.status)
+      }
+    } catch (error) {
+      console.log("Error getting eBay user info:", error)
+    }
+    console.log("===========================")
+
     // Check if token is expired
     let accessToken = ebayToken.accessToken
     if (new Date() > ebayToken.expiresAt) {
@@ -85,29 +131,33 @@ export async function GET() {
       ? "https://api.sandbox.ebay.com"
       : "https://api.ebay.com"
 
+    // Use marketplace from env or default to EBAY_US
+    const marketplace = process.env.EBAY_MARKETPLACE_ID || 'EBAY_US'
+    
     // Fetch all three policy types
     console.log("Fetching eBay policies from:", baseUrl)
+    console.log("Using marketplace:", marketplace)
     
     const [fulfillmentResponse, paymentResponse, returnResponse] = await Promise.all([
-      fetch(`${baseUrl}/sell/account/v1/fulfillment_policy`, {
+      fetch(`${baseUrl}/sell/account/v1/fulfillment_policy?marketplace_id=${marketplace}`, {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
-          'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
+          'X-EBAY-C-MARKETPLACE-ID': marketplace,
         },
       }),
-      fetch(`${baseUrl}/sell/account/v1/payment_policy`, {
+      fetch(`${baseUrl}/sell/account/v1/payment_policy?marketplace_id=${marketplace}`, {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
-          'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
+          'X-EBAY-C-MARKETPLACE-ID': marketplace,
         },
       }),
-      fetch(`${baseUrl}/sell/account/v1/return_policy`, {
+      fetch(`${baseUrl}/sell/account/v1/return_policy?marketplace_id=${marketplace}`, {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
-          'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
+          'X-EBAY-C-MARKETPLACE-ID': marketplace,
         },
       }),
     ])
@@ -180,6 +230,11 @@ export async function GET() {
       paymentCount: paymentData.paymentPolicies?.length || 0,
       returnCount: returnData.returnPolicies?.length || 0
     })
+
+    // Log raw data to debug
+    console.log("Raw fulfillment response:", JSON.stringify(fulfillmentData, null, 2))
+    console.log("Raw payment response:", JSON.stringify(paymentData, null, 2))
+    console.log("Raw return response:", JSON.stringify(returnData, null, 2))
 
     // Format the policies for frontend consumption
     const policies = {
