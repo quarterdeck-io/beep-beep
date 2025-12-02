@@ -24,7 +24,26 @@ export async function POST(req: Request) {
       )
     }
 
-    let { title, description, price, condition, imageUrl, categoryId, upc, ean, isbn, mpn, brand, aspects } = body
+    let { 
+      title, 
+      description, 
+      price, 
+      condition, 
+      imageUrl, 
+      categoryId, 
+      upc, 
+      ean, 
+      isbn, 
+      mpn, 
+      brand, 
+      aspects,
+      // Additional fields from Browse API
+      epid,  // eBay Product ID for better catalog matching
+      additionalImages,  // Array of additional image URLs
+      itemWebUrl,  // Original eBay listing URL (for reference)
+      categories,  // Category information from Browse API
+      conditionId  // Condition ID from Browse API
+    } = body
 
     // Validate and sanitize required fields
     const missingFields: string[] = []
@@ -55,6 +74,13 @@ export async function POST(req: Request) {
     } else {
       condition = condition.trim()
     }
+    
+    // Image validation - eBay requires at least one image
+    const hasImage = (imageUrl && imageUrl.trim().length > 0) || 
+                     (additionalImages && Array.isArray(additionalImages) && additionalImages.length > 0)
+    if (!hasImage) {
+      missingFields.push("image (at least one product image is required)")
+    }
 
     if (missingFields.length > 0) {
       return NextResponse.json(
@@ -64,7 +90,8 @@ export async function POST(req: Request) {
             title: title || null, 
             description: description || null, 
             price, 
-            condition: condition || null 
+            condition: condition || null,
+            hasImage
           }
         },
         { status: 400 }
@@ -248,17 +275,38 @@ export async function POST(req: Request) {
       title: title.substring(0, 80), // eBay title limit is 80 characters
     }
     
+    // Add eBay Product ID (ePID) for better catalog matching - highest priority
+    if (epid && epid.trim().length > 0) {
+      productObj.epid = epid.trim()
+      console.log("Using eBay Product ID (ePID) for catalog matching:", epid)
+    }
+    
     // Add description if provided
     if (description && description.trim().length > 0 && description !== "No description") {
       productObj.description = description.substring(0, 50000)
     }
     
     // Add images if provided - eBay expects imageUrls array
+    const allImages: string[] = []
     if (imageUrl && imageUrl.trim().length > 0) {
-      productObj.imageUrls = [imageUrl]
+      allImages.push(imageUrl.trim())
+    }
+    // Add additional images from Browse API if available
+    if (additionalImages && Array.isArray(additionalImages)) {
+      additionalImages.forEach((img: any) => {
+        const imgUrl = typeof img === 'string' ? img : img?.imageUrl
+        if (imgUrl && imgUrl.trim().length > 0 && !allImages.includes(imgUrl)) {
+          allImages.push(imgUrl.trim())
+        }
+      })
+    }
+    if (allImages.length > 0) {
+      productObj.imageUrls = allImages.slice(0, 12) // eBay allows up to 12 images
+      console.log(`Added ${allImages.length} images to product (max 12)`)
     }
     
     // Add product identifiers (UPC, EAN, ISBN, etc.) if provided
+    // Priority order: UPC > EAN > ISBN
     if (upc && upc.trim().length > 0) {
       productObj.upc = [upc.trim()]
     }
@@ -278,6 +326,7 @@ export async function POST(req: Request) {
     // Add product aspects (category-specific attributes) if provided
     if (aspects && typeof aspects === 'object' && Object.keys(aspects).length > 0) {
       productObj.aspects = aspects
+      console.log("Product aspects included:", Object.keys(aspects).join(", "))
     }
     
     // Build inventory payload (SKU is in URL, not body!)
@@ -564,12 +613,24 @@ export async function POST(req: Request) {
     }
 
     // Step 4: Create an offer
-    // Use a valid category ID - 267 is Movies & TV, but let's try to get a better one
-    // If no categoryId provided, use a common default based on product type
+    // Try to get category from Browse API data first, then fallback
     let finalCategoryId = categoryId
+    
+    // If we have categories array from Browse API, use the primary category
+    if (!finalCategoryId && categories && Array.isArray(categories) && categories.length > 0) {
+      // Browse API returns categories with categoryId
+      const primaryCategory = categories[0]
+      if (primaryCategory && primaryCategory.categoryId) {
+        finalCategoryId = primaryCategory.categoryId
+        console.log("Using category from Browse API:", primaryCategory.categoryName || primaryCategory.categoryId)
+      }
+    }
+    
+    // If still no category, use default
     if (!finalCategoryId || finalCategoryId === "") {
       // Default to Movies & TV category (267) - common for DVDs/Blu-rays
       finalCategoryId = "267"
+      console.warn("No category provided, using default category 267 (Movies & TV)")
     }
     
     const offerPayload: any = {
@@ -577,6 +638,8 @@ export async function POST(req: Request) {
       marketplaceId: "EBAY_US",
       format: "FIXED_PRICE",
       listingDescription: description.substring(0, 50000), // eBay description limit
+      listingDuration: "GTC", // Good 'Til Cancelled - recommended for fixed price
+      includeCatalogProductDetails: true, // Use eBay catalog data when available
       pricingSummary: {
         price: {
           value: parseFloat(price).toFixed(2),
@@ -584,7 +647,7 @@ export async function POST(req: Request) {
         },
       },
       categoryId: finalCategoryId,
-      quantity: 1,
+      availableQuantity: 1, // Explicit quantity (recommended)
       merchantLocationKey: merchantLocationKey, // Required for publishing
     }
     
@@ -596,6 +659,14 @@ export async function POST(req: Request) {
         returnPolicyId: returnPolicyId,
       }
     }
+    
+    console.log("Offer payload includes:", {
+      listingDuration: offerPayload.listingDuration,
+      includeCatalogProductDetails: offerPayload.includeCatalogProductDetails,
+      categoryId: finalCategoryId,
+      hasEpid: !!epid,
+      imageCount: allImages.length
+    })
     
     // Log complete request details for Postman
     const offerUrl = `${baseUrl}/sell/inventory/v1/offer`
