@@ -263,9 +263,12 @@ export async function POST(req: Request) {
       console.warn("SKU settings not available, using default:", error)
     }
 
-    // Generate SKU using user's settings
+    // Generate SKU using user's settings with timestamp for uniqueness
     const prefix = skuSettings.skuPrefix || "SKU"
-    const sku = `${prefix}-${skuSettings.nextSkuCounter}`
+    const timestamp = Date.now().toString().slice(-6) // Last 6 digits of timestamp for uniqueness
+    const sku = `${prefix}-${skuSettings.nextSkuCounter}-${timestamp}`
+    
+    console.log("Generated unique SKU:", sku)
     
     // Increment the counter for next time (we'll update it after successful listing)
 
@@ -720,8 +723,113 @@ export async function POST(req: Request) {
 
     if (!offerResponse.ok) {
       const errorData = await offerResponse.json().catch(() => ({}))
+      const errorCode = errorData.errors?.[0]?.errorId
       
-      // If offer creation fails, try to clean up the inventory item
+      // Error 25002: Offer already exists - try to update existing offer instead
+      if (errorCode === 25002) {
+        console.log("Offer already exists, attempting to update existing offer...")
+        const existingOfferId = errorData.errors?.[0]?.parameters?.find((p: any) => p.name === "offerId")?.value
+        
+        if (existingOfferId) {
+          console.log("Found existing offer ID:", existingOfferId)
+          
+          // Try to update the existing offer
+          const updateUrl = `${baseUrl}/sell/inventory/v1/offer/${existingOfferId}`
+          console.log("Updating existing offer:", updateUrl)
+          
+          const updateResponse = await fetch(updateUrl, {
+            method: "PUT",
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+              'Content-Language': 'en-US',
+              'Accept-Language': 'en-US',
+              'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
+            },
+            body: JSON.stringify(offerPayload),
+          })
+          
+          if (updateResponse.ok) {
+            console.log("✅ Existing offer updated successfully")
+            // Use the existing offer ID to publish
+            const offerId = existingOfferId
+            
+            // Continue to Step 5: Publish the offer
+            const publishUrl = `${baseUrl}/sell/inventory/v1/offer/${offerId}/publish`
+            console.log("=".repeat(80))
+            console.log("API CALL #5: PUBLISH OFFER (existing)")
+            console.log("URL:", publishUrl)
+            console.log("=".repeat(80))
+            
+            const publishResponse = await fetch(publishUrl, {
+              method: "POST",
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+                'Content-Language': 'en-US',
+                'Accept-Language': 'en-US',
+                'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
+              },
+            })
+            
+            if (!publishResponse.ok) {
+              const publishErrorData = await publishResponse.json().catch(() => ({}))
+              const publishErrorMessage = publishErrorData.errors?.[0]?.message || "Failed to publish existing offer"
+              return NextResponse.json(
+                { 
+                  error: publishErrorMessage,
+                  details: publishErrorData,
+                  offerId: offerId,
+                  hint: "Offer updated but not published. You can publish it manually from your eBay Seller Hub.",
+                },
+                { status: publishResponse.status }
+              )
+            }
+            
+            const publishData = await publishResponse.json()
+            
+            // Update SKU counter after successful listing
+            if (shouldIncrementCounter) {
+              try {
+                await (prisma as any).skuSettings.update({
+                  where: { userId: session.user.id },
+                  data: {
+                    nextSkuCounter: skuSettings.nextSkuCounter + 1,
+                  }
+                })
+              } catch (error) {
+                console.error("Failed to update SKU counter:", error)
+              }
+            }
+            
+            return NextResponse.json({
+              success: true,
+              message: "Product listing updated and published successfully on eBay",
+              listingId: publishData.listingId,
+              offerId: offerId,
+              sku: finalSku,
+              listingUrl: `https://www.ebay.com/itm/${publishData.listingId}`,
+              updated: true, // Flag to indicate this was an update, not new listing
+            })
+          } else {
+            const updateErrorData = await updateResponse.json().catch(() => ({}))
+            console.error("Failed to update existing offer:", updateErrorData)
+            
+            // If update fails, suggest deleting and trying again
+            return NextResponse.json(
+              { 
+                error: "An offer already exists for this SKU and could not be updated. Please try a different product or wait a moment.",
+                details: updateErrorData,
+                existingOfferId: existingOfferId,
+                hint: "The SKU is already in use. Either list a different product or contact support to remove the existing offer.",
+              },
+              { status: 409 } // 409 Conflict
+            )
+          }
+        }
+      }
+      
+      // If offer creation fails for other reasons, try to clean up the inventory item
       try {
         await fetch(`${baseUrl}/sell/inventory/v1/inventory_item/${finalSku}`, {
           method: "DELETE",
