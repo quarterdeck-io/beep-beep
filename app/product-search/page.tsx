@@ -168,18 +168,38 @@ export default function ProductSearchPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
+          // Editable fields
           title: editedTitle || productData.title || "",
           description: editedDescription || productData.shortDescription || productData.description || "",
           price: editedPrice || productData.price?.value || "0.00",
           condition: editedCondition || productData.condition || "Brand New",
+          
+          // Images - primary and additional
           imageUrl: productData.image?.imageUrl || "",
+          additionalImages: productData.additionalImages || [],
+          
+          // Category information from Browse API
           categoryId: productData.categoryId || "",
+          categories: productData.categories || [],
+          
+          // Product identifiers
           upc: upc || productData.gtin || "", // Pass the scanned UPC
           ean: productData.ean || "",
           isbn: productData.isbn || "",
           mpn: productData.mpn || "",
           brand: productData.brand || "",
+          
+          // eBay Product ID for better catalog matching
+          epid: productData.epid || "",
+          
+          // Product aspects (item specifics)
           aspects: productData.localizedAspects || productData.aspects || null,
+          
+          // Condition ID from Browse API
+          conditionId: productData.conditionId || "",
+          
+          // Reference URL (for debugging/logging)
+          itemWebUrl: productData.itemWebUrl || "",
         }),
       })
       
