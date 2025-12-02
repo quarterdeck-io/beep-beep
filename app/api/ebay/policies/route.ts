@@ -86,6 +86,8 @@ export async function GET() {
       : "https://api.ebay.com"
 
     // Fetch all three policy types
+    console.log("Fetching eBay policies from:", baseUrl)
+    
     const [fulfillmentResponse, paymentResponse, returnResponse] = await Promise.all([
       fetch(`${baseUrl}/sell/account/v1/fulfillment_policy`, {
         headers: {
@@ -110,10 +112,74 @@ export async function GET() {
       }),
     ])
 
-    // Parse responses
+    // Log response statuses
+    console.log("Policy API responses:", {
+      fulfillment: fulfillmentResponse.status,
+      payment: paymentResponse.status,
+      return: returnResponse.status
+    })
+
+    // Check for errors and log them
+    if (!fulfillmentResponse.ok) {
+      const errorData = await fulfillmentResponse.json()
+      console.error("Fulfillment policy error:", errorData)
+      
+      // Check for scope error
+      if (fulfillmentResponse.status === 403 || fulfillmentResponse.status === 401) {
+        return NextResponse.json(
+          { 
+            error: "Missing required permissions. Please disconnect and reconnect your eBay account to grant 'sell.account' scope.",
+            needsReconnect: true,
+            details: errorData
+          },
+          { status: 403 }
+        )
+      }
+    }
+
+    if (!paymentResponse.ok) {
+      const errorData = await paymentResponse.json()
+      console.error("Payment policy error:", errorData)
+      
+      if (paymentResponse.status === 403 || paymentResponse.status === 401) {
+        return NextResponse.json(
+          { 
+            error: "Missing required permissions. Please disconnect and reconnect your eBay account to grant 'sell.account' scope.",
+            needsReconnect: true,
+            details: errorData
+          },
+          { status: 403 }
+        )
+      }
+    }
+
+    if (!returnResponse.ok) {
+      const errorData = await returnResponse.json()
+      console.error("Return policy error:", errorData)
+      
+      if (returnResponse.status === 403 || returnResponse.status === 401) {
+        return NextResponse.json(
+          { 
+            error: "Missing required permissions. Please disconnect and reconnect your eBay account to grant 'sell.account' scope.",
+            needsReconnect: true,
+            details: errorData
+          },
+          { status: 403 }
+        )
+      }
+    }
+
+    // Parse successful responses
     const fulfillmentData = fulfillmentResponse.ok ? await fulfillmentResponse.json() : { fulfillmentPolicies: [] }
     const paymentData = paymentResponse.ok ? await paymentResponse.json() : { paymentPolicies: [] }
     const returnData = returnResponse.ok ? await returnResponse.json() : { returnPolicies: [] }
+
+    // Log what we got
+    console.log("Policies fetched:", {
+      fulfillmentCount: fulfillmentData.fulfillmentPolicies?.length || 0,
+      paymentCount: paymentData.paymentPolicies?.length || 0,
+      returnCount: returnData.returnPolicies?.length || 0
+    })
 
     // Format the policies for frontend consumption
     const policies = {
