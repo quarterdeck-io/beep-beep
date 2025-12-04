@@ -411,7 +411,7 @@ export default function SettingsPage() {
               <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
                 Set the initial SKU number for your listings. This will be used as the starting point and incremented for each new listing.
               </p>
-               <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg"></div>
+              <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg">
                 <p className="text-sm text-yellow-800 dark:text-yellow-300">
                   <strong>📌 SKU Format:</strong> All SKUs include a static "000" separator: <span className="font-mono font-bold">{`{Prefix}-000-{Counter}`}</span>
                 </p>
