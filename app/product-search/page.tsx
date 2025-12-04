@@ -976,44 +976,56 @@ export default function ProductSearchPage() {
           {productData && !isDuplicate && (
             <>
               {/* Previously Listed SKU - Show when exists */}
-                <div className="flex gap-3.5">
-                  {listedSku && (
-                    <div className="mb-6">
-                      <div className="p-4 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border border-green-300 dark:border-green-700 rounded-lg w-96">
-                        <h3 className="text-sm font-medium text-green-900 dark:text-green-300 mb-2">
-                          Previous SKU Number
-                        </h3>
-                        <p className="text-2xl font-bold text-green-700 dark:text-green-400 font-mono">
-                          {listedSku}
-                        </p>
-                        <p className="text-xs text-green-600 dark:text-green-400 mt-2">
-                          This SKU was assigned to your last listed product
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* SKU Preview */}
+              <div className="flex gap-3.5">
+                {listedSku && (
                   <div className="mb-6">
-                    <div className="p-4 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border border-purple-200 dark:border-purple-700 rounded-lg w-96">
-                      <h3 className="text-sm font-medium text-purple-900 dark:text-purple-300 mb-2">
-                        SKU Preview
+                    <div className="p-4 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border border-green-300 dark:border-green-700 rounded-lg w-96">
+                      <h3 className="text-sm font-medium text-green-900 dark:text-green-300 mb-2">
+                        Previous SKU Number
                       </h3>
-                      {loadingSku ? (
-                        <p className="text-sm text-purple-600 dark:text-purple-400">Loading...</p>
-                      ) : skuPreview ? (
-                        <p className="text-2xl font-bold text-purple-700 dark:text-purple-400 font-mono">
-                          {skuPreview}
-                        </p>
-                      ) : (
-                        <p className="text-sm text-purple-600 dark:text-purple-400">No SKU available</p>
-                      )}
-                      <p className="text-xs text-purple-600 dark:text-purple-400 mt-2">
-                        This SKU will be assigned when you list this product
+                      <p className="text-2xl font-bold text-green-700 dark:text-green-400 font-mono">
+                        {listedSku}
+                      </p>
+                      <p className="text-xs text-green-600 dark:text-green-400 mt-2">
+                        This SKU was assigned to your last listed product
                       </p>
                     </div>
                   </div>
+                )}
+                
+                {/* SKU Preview */}
+                <div className="mb-6">
+                  <div className="p-4 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border border-purple-200 dark:border-purple-700 rounded-lg w-96">
+                    <h3 className="text-sm font-medium text-purple-900 dark:text-purple-300 mb-2">
+                      SKU Preview
+                    </h3>
+                    {loadingSku ? (
+                      <p className="text-sm text-purple-600 dark:text-purple-400">Loading...</p>
+                    ) : skuPreview ? (
+                      <p className="text-2xl font-bold text-purple-700 dark:text-purple-400 font-mono">
+                        {skuPreview}
+                      </p>
+                    ) : (
+                      <p className="text-sm text-purple-600 dark:text-purple-400">No SKU available</p>
+                    )}
+                    <p className="text-xs text-purple-600 dark:text-purple-400 mt-2">
+                      This SKU will be assigned when you list this product
+                    </p>
+                  </div>
                 </div>
+              </div>
+
+              {/* Keyboard Shortcut Hint */}
+              <div className="flex items-center gap-2 mt-4 text-sm text-gray-600 dark:text-gray-400">
+                <svg className="w-4 h-4 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
+                </svg>
+                <span>Use</span>
+                <kbd className="px-2 py-1 text-xs font-semibold text-gray-800 bg-gray-100 border border-gray-200 rounded-lg dark:bg-gray-700 dark:text-gray-100 dark:border-gray-600">Space</kbd>
+                <span>to confirm or</span>
+                <kbd className="px-2 py-1 text-xs font-semibold text-gray-800 bg-gray-100 border border-gray-200 rounded-lg dark:bg-gray-700 dark:text-gray-100 dark:border-gray-600">Escape</kbd>
+                <span>to cancel</span>
+              </div>
 
               <div className="bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden">
               <div className="p-6">
@@ -1293,7 +1305,7 @@ export default function ProductSearchPage() {
                               </>
                             )}
                             
-                            {/* <div className="space-y-4">
+                            <div className="space-y-4">
                               {missingAspects.map((aspect) => {
                                 const aspectDef = aspectDefinitions.find((a: any) => a.name === aspect)
                                 const hasPredefinedValues = aspectDef && aspectDef.values && aspectDef.values.length > 0
@@ -1328,19 +1340,7 @@ export default function ProductSearchPage() {
                                   </div>
                                 )
                               })}
-                            </div> */}
-                            
-                            {/* Keyboard Shortcut Hint */}
-                            <div className="flex items-center gap-2 mt-4 text-sm text-gray-600 dark:text-gray-400">
-                              <svg className="w-4 h-4 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
-                                <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
-                              </svg>
-                              <span>Use</span>
-                              <kbd className="px-2 py-1 text-xs font-semibold text-gray-800 bg-gray-100 border border-gray-200 rounded-lg dark:bg-gray-700 dark:text-gray-100 dark:border-gray-600">Space</kbd>
-                              <span>to confirm or</span>
-                              <kbd className="px-2 py-1 text-xs font-semibold text-gray-800 bg-gray-100 border border-gray-200 rounded-lg dark:bg-gray-700 dark:text-gray-100 dark:border-gray-600">Escape</kbd>
-                              <span>to cancel</span>
-                            </div>
+                            </div>                        
                             
                             <div className="flex gap-3 mt-6">
                               <button
