@@ -62,6 +62,9 @@ export default function ProductSearchPage() {
   const [duplicateSku, setDuplicateSku] = useState<string>("")
   const [checkingDuplicate, setCheckingDuplicate] = useState(false)
   
+  // Mean price tracking state
+  const [isMeanPrice, setIsMeanPrice] = useState(false)
+  
   // Available conditions for dropdown
   const conditions = [
     "Used - Very Good",
@@ -123,6 +126,7 @@ export default function ProductSearchPage() {
       setEditedDescription(data.shortDescription || data.description || "")
       setEditedCondition(data.condition || "Used - Very Good")
       setEditedPrice(data.price?.value || "0.00")
+      setIsMeanPrice(data._searchMetadata?.isMeanPrice || false)
       setIsEditing(false)
       setListingSuccess(null)
       setListingError(null)
@@ -177,6 +181,7 @@ export default function ProductSearchPage() {
     setEditedDescription("")
     setEditedCondition("")
     setEditedPrice("")
+    setIsMeanPrice(false) // Clear mean price flag
     setIsEditing(false)
     setListingLoading(false)
     setListingSuccess(null)
@@ -1058,6 +1063,11 @@ export default function ProductSearchPage() {
                       <div>
                         <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">
                           Price
+                          {isMeanPrice && (
+                            <span className="block text-xs text-blue-600 dark:text-blue-400 mt-1 font-normal">
+                              This is the mean price of latest 10 listing
+                            </span>
+                          )}
                         </h3>
                         {isEditing ? (
                           <div className="flex items-center gap-2">
