@@ -136,17 +136,29 @@ export async function GET(req: Request) {
 
     const data = await ebayResponse.json()
     
-    // Return the first item summary or an empty result
-    const product = data.itemSummaries?.[0] || null
-    
-    if (!product) {
+    // Check if we have any products
+    if (!data.itemSummaries || data.itemSummaries.length === 0) {
       return NextResponse.json(
         { error: "No products found for this UPC code" },
         { status: 404 }
       )
     }
+    
+    // Select a RANDOM product from the search results
+    const randomIndex = Math.floor(Math.random() * data.itemSummaries.length)
+    const product = data.itemSummaries[randomIndex]
+    
+    // Add metadata about the search for debugging
+    const responseData = {
+      ...product,
+      _searchMetadata: {
+        totalResults: data.itemSummaries.length,
+        selectedIndex: randomIndex,
+        searchQuery: upc
+      }
+    }
 
-    return NextResponse.json(product)
+    return NextResponse.json(responseData)
   } catch (error) {
     return NextResponse.json(
       { error: "Something went wrong", details: error instanceof Error ? error.message : "Unknown error" },
