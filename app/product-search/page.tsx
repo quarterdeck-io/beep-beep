@@ -1004,16 +1004,11 @@ export default function ProductSearchPage() {
 
                     {/* Seller - Read Only */}
                     {productData.seller && productData.seller.feedbackPercentage && (
-                      <div>
-                        <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">
-                          Seller Feedback
-                        </h3>
                         <p className="mt-1 text-gray-900 dark:text-white">
                           <span className="text-green-600 dark:text-green-400 font-semibold">
                             {productData.seller.feedbackPercentage}% positive
                           </span>
                         </p>
-                      </div>
                     )}
 
                     {/* Action Buttons */}
