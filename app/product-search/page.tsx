@@ -17,6 +17,10 @@ interface ProductData {
   image?: {
     imageUrl?: string
   }
+  seller?: {
+    // username?: string
+    feedbackPercentage?: string
+  }
   [key: string]: any
 }
 
@@ -112,7 +116,7 @@ export default function ProductSearchPage() {
       // Initialize editable fields with product data
       setEditedTitle(data.title || "")
       setEditedDescription(data.shortDescription || data.description || "")
-      setEditedCondition(data.condition || "Brand New")
+      setEditedCondition(data.condition || "Used - Very Good")
       setEditedPrice(data.price?.value || "0.00")
       setIsEditing(false)
       setListingSuccess(null)
@@ -150,10 +154,28 @@ export default function ProductSearchPage() {
     if (productData) {
       setEditedTitle(productData.title || "")
       setEditedDescription(productData.shortDescription || productData.description || "")
-      setEditedCondition(productData.condition || "Brand New")
+      setEditedCondition(productData.condition || "Used - Very Good")
       setEditedPrice(productData.price?.value || "0.00")
     }
     setIsEditing(false)
+  }
+  
+  const handleClearProduct = () => {
+    // Clear all product-related state
+    setProductData(null)
+    setEditedTitle("")
+    setEditedDescription("")
+    setEditedCondition("")
+    setEditedPrice("")
+    setIsEditing(false)
+    setListingLoading(false)
+    setListingSuccess(null)
+    setListingError(null)
+    setMissingAspects([])
+    setAspectDefinitions([])
+    setUserProvidedAspects({})
+    setShowAspectForm(false)
+    setError("")
   }
   
   const handleListOnEbay = async (additionalAspects?: Record<string, string>) => {
@@ -188,7 +210,7 @@ export default function ProductSearchPage() {
           title: editedTitle || productData.title || "",
           description: editedDescription || productData.shortDescription || productData.description || "",
           price: editedPrice || productData.price?.value || "0.00",
-          condition: editedCondition || productData.condition || "Brand New",
+          condition: editedCondition || productData.condition || "Used - Very Good",
           
           // Images - primary and additional
           imageUrl: productData.image?.imageUrl || "",
@@ -588,6 +610,47 @@ export default function ProductSearchPage() {
       }
     }
   }, [])
+  
+  // Add keyboard support for Escape key to clear product and Spacebar to list on eBay
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only clear if:
+      // 1. Escape key is pressed
+      // 2. Product data exists
+      // 3. Scanner is not active (to avoid conflicts)
+      // 4. No aspect form is showing (to allow escape to close form first)
+      if (e.key === "Escape" && productData && !scannerActive && !showAspectForm) {
+        handleClearProduct()
+      }
+      
+      // List on eBay with spacebar:
+      // 1. Spacebar is pressed
+      // 2. Product data exists
+      // 3. Not currently editing (to avoid conflicts with text inputs)
+      // 4. Not currently listing (to avoid duplicate listings)
+      // 5. Scanner is not active
+      // 6. No aspect form is showing
+      // 7. Target is not an input, textarea, or button (to avoid conflicts)
+      if (
+        e.key === " " && 
+        productData && 
+        !isEditing && 
+        !listingLoading && 
+        !scannerActive && 
+        !showAspectForm &&
+        !(e.target instanceof HTMLInputElement) &&
+        !(e.target instanceof HTMLTextAreaElement) &&
+        !(e.target instanceof HTMLButtonElement) &&
+        !(e.target instanceof HTMLSelectElement)
+      ) {
+        e.preventDefault() // Prevent page scroll
+        handleListOnEbay()
+      }
+    }
+    
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [productData, scannerActive, showAspectForm, isEditing, listingLoading])
 
   if (checking) {
     return (
@@ -794,9 +857,22 @@ export default function ProductSearchPage() {
           {productData && (
             <div className="bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden">
               <div className="p-6">
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
-                  Product Information
-                </h2>
+                <div className="mb-4">
+                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                    Product Information
+                  </h2>
+                  <div className="flex flex-wrap gap-3 text-xs text-gray-500 dark:text-gray-400">
+                    <p className="flex items-center gap-1">
+                      <kbd className="px-2 py-1 text-xs font-semibold text-gray-800 bg-gray-100 border border-gray-200 rounded dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600">SPACE</kbd>
+                      <span>List on eBay</span>
+                    </p>
+                    <span className="text-gray-300 dark:text-gray-600">•</span>
+                    <p className="flex items-center gap-1">
+                      <kbd className="px-2 py-1 text-xs font-semibold text-gray-800 bg-gray-100 border border-gray-200 rounded dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600">ESC</kbd>
+                      <span>Clear</span>
+                    </p>
+                  </div>
+                </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Product Image */}
@@ -936,8 +1012,22 @@ export default function ProductSearchPage() {
                       )}
                     </div>
 
+                    {/* Seller - Read Only */}
+                    {productData.seller && productData.seller.feedbackPercentage && (
+                      <div>
+                        <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">
+                          Seller Feedback
+                        </h3>
+                        <p className="mt-1 text-gray-900 dark:text-white">
+                          <span className="text-green-600 dark:text-green-400 font-semibold">
+                            {productData.seller.feedbackPercentage}% positive
+                          </span>
+                        </p>
+                      </div>
+                    )}
+
                     {/* Action Buttons */}
-                    <div className="flex flex-col sm:flex-row gap-3">
+                    <div className="flex flex-col sm:flex-row gap-3 mt-6">
                       {/* List on eBay Button */}
                       <button
                         onClick={() => handleListOnEbay()}
