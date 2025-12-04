@@ -144,16 +144,37 @@ export async function GET(req: Request) {
       )
     }
     
-    // Select a RANDOM product from the search results
-    const randomIndex = Math.floor(Math.random() * data.itemSummaries.length)
-    const product = data.itemSummaries[randomIndex]
+    // Get first 10 items for mean price calculation
+    const itemsForMean = data.itemSummaries.slice(0, 10)
+    
+    // Calculate mean price from first 10 items (filter out items without valid prices)
+    const prices = itemsForMean
+      .filter((item: any) => item.price?.value)
+      .map((item: any) => parseFloat(item.price.value))
+    
+    const meanPrice = prices.length > 0
+      ? (prices.reduce((sum: number, price: number) => sum + price, 0) / prices.length).toFixed(2)
+      : "0.00"
+    
+    // Use first product but with mean price
+    const product = {
+      ...data.itemSummaries[0],
+      price: {
+        ...data.itemSummaries[0].price,
+        value: meanPrice,
+        currency: data.itemSummaries[0].price?.currency || "USD"
+      }
+    }
     
     // Add metadata about the search for debugging
     const responseData = {
       ...product,
       _searchMetadata: {
         totalResults: data.itemSummaries.length,
-        selectedIndex: randomIndex,
+        itemsUsedForMean: prices.length,
+        isMeanPrice: true,
+        originalPrice: data.itemSummaries[0].price?.value,
+        meanPrice: meanPrice,
         searchQuery: upc
       }
     }
