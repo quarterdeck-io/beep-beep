@@ -1281,16 +1281,19 @@ export default function ProductSearchPage() {
                               </>
                             ) : (
                               <>
-                                <h3 className="font-semibold text-yellow-800 dark:text-yellow-300 mb-2">
-                                  Required Item Specifics Missing
+                               <h3 className="text-2xl font-bold text-red-700 dark:text-red-400 mb-2">
+                                  DUPLICATE SKU: {duplicateSku}
                                 </h3>
-                                <p className="text-sm text-yellow-700 dark:text-yellow-400 mb-4">
-                                  This product category requires the following item specifics. Please provide them to continue listing:
+                                <p className="text-sm text-red-600 dark:text-red-300 mb-2">
+                                  An item with the same UPC <span className="font-mono font-semibold">{upc}</span> already exists in your eBay inventory.
+                                </p>
+                                <p className="text-sm text-red-600 dark:text-red-300 mb-4">
+                                  This may indicate you already have this item listed. Please review carefully before proceeding.
                                 </p>
                               </>
                             )}
                             
-                            <div className="space-y-4">
+                            {/* <div className="space-y-4">
                               {missingAspects.map((aspect) => {
                                 const aspectDef = aspectDefinitions.find((a: any) => a.name === aspect)
                                 const hasPredefinedValues = aspectDef && aspectDef.values && aspectDef.values.length > 0
@@ -1325,7 +1328,7 @@ export default function ProductSearchPage() {
                                   </div>
                                 )
                               })}
-                            </div>
+                            </div> */}
                             
                             {/* Keyboard Shortcut Hint */}
                             <div className="flex items-center gap-2 mt-4 text-sm text-gray-600 dark:text-gray-400">
