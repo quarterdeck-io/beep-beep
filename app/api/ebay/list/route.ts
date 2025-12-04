@@ -264,15 +264,14 @@ export async function POST(req: Request) {
       console.warn("SKU settings not available, using default:", error)
     }
 
-    // Generate SKU using user's settings: {Prefix}-000{counter}
-    // Default format ensures "000" prefix is always present for counters below 1000
+    // Generate SKU using user's settings: {Prefix}-000-{counter}
+    // Client requirement: "000" is a STATIC separator between prefix and counter
+    // Format: DVD-000-1, DVD-000-2, DVD-000-10, etc.
     const prefix = skuSettings.skuPrefix || "SKU"
-    // Pad counter with leading zeros to 4 digits (e.g., 1 -> 0001, 15 -> 0015, 123 -> 0123, 1000 -> 1000)
-    // This ensures the "000" prefix is visible by default as per requirement
-    const paddedCounter = skuSettings.nextSkuCounter.toString().padStart(4, '0')
-    const sku = `${prefix}-${paddedCounter}`
+    const counter = skuSettings.nextSkuCounter
+    const sku = `${prefix}-000-${counter}`
     
-    console.log("Generated SKU:", sku, `(Counter: ${skuSettings.nextSkuCounter}, Format: ${prefix}-000X)`)
+    console.log("Generated SKU:", sku, `(Counter: ${counter}, Format: ${prefix}-000-X)`)
     
     // Increment the counter for next time (we'll update it after successful listing)
 
