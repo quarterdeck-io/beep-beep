@@ -126,7 +126,6 @@ export default function ProductSearchPage() {
     setError("")
     setProductData(null)
     setListingError(null) // Clear any previous listing errors
-    // Don't clear listedSku - keep it visible when searching new product
     setLoading(true)
 
     try {
@@ -206,7 +205,7 @@ export default function ProductSearchPage() {
     setListingLoading(false)
     setListingSuccess(null)
     setListingError(null)
-    setListedSku(null) // Clear listed SKU
+    setListedSku(null) // Clear previous SKU
     setMissingAspects([])
     setAspectDefinitions([])
     setUserProvidedAspects({})
@@ -407,7 +406,7 @@ export default function ProductSearchPage() {
       }
       
       setListingSuccess(data.listingUrl || data.message || "Product listed successfully!")
-      setListedSku(data.sku || null)
+      setListedSku(data.sku || null) // Store the SKU that was just listed
       // Refresh SKU preview to show the next available SKU
       fetchSkuPreview()
       setIsEditing(false)
@@ -966,7 +965,7 @@ export default function ProductSearchPage() {
           {/* Show product details only if NOT a duplicate */}
           {productData && !isDuplicate && (
             <>
-              {/* Previously Listed SKU - Show after listing and persist when searching */}
+              {/* Previously Listed SKU - Show when exists */}
               {listedSku && (
                 <div className="mb-6">
                   <div className="p-4 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border border-green-300 dark:border-green-700 rounded-lg w-96">
@@ -977,7 +976,7 @@ export default function ProductSearchPage() {
                       {listedSku}
                     </p>
                     <p className="text-xs text-green-600 dark:text-green-400 mt-2">
-                      {loadingSku ? "This SKU was assigned to the product you just listed" : "This SKU was assigned to your last listed product"}
+                      This SKU was assigned to your last listed product
                     </p>
                   </div>
                 </div>
@@ -1235,13 +1234,8 @@ export default function ProductSearchPage() {
                           <svg className="w-5 h-5 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                           </svg>
-                          <div className="flex-1">
+                          <div>
                             <p className="font-semibold">Success!</p>
-                            {listedSku && (
-                              <p className="font-mono text-sm mb-2">
-                                <span className="font-semibold">SKU:</span> {listedSku}
-                              </p>
-                            )}
                             <p>{listingSuccess}</p>
                           </div>
                         </div>
