@@ -264,14 +264,14 @@ export async function POST(req: Request) {
       console.warn("SKU settings not available, using default:", error)
     }
 
-    // Generate SKU using user's settings: {Prefix}-000-{counter}
-    // Client requirement: "000" is a STATIC separator between prefix and counter
-    // Format: DVD-000-1, DVD-000-2, DVD-000-10, etc.
+    // Generate SKU using user's settings: {Prefix}-000{counter}
+    // Client requirement: "000" is literally prepended to the counter
+    // Format: DVD-0001, DVD-00010, DVD-000100, etc.
     const prefix = skuSettings.skuPrefix || "SKU"
     const counter = skuSettings.nextSkuCounter
-    const sku = `${prefix}-000-${counter}`
+    const sku = `${prefix}-000${counter}`
     
-    console.log("Generated SKU:", sku, `(Counter: ${counter}, Format: ${prefix}-000-X)`)
+    console.log("Generated SKU:", sku, `(Counter: ${counter}, Format: ${prefix}-000X)`)
     
     // Increment the counter for next time (we'll update it after successful listing)
 
