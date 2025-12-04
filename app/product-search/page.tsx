@@ -18,7 +18,7 @@ interface ProductData {
     imageUrl?: string
   }
   seller?: {
-    username?: string
+    // username?: string
     feedbackPercentage?: string
   }
   [key: string]: any
@@ -59,15 +59,15 @@ export default function ProductSearchPage() {
   
   // Available conditions for dropdown
   const conditions = [
+    "Used - Very Good",
+    "Used - Excellent",
+    "Used - Good",
+    "Used - Acceptable",
     "Brand New",
     "New Other",
     "New with Defects",
     "Manufacturer Refurbished",
     "Seller Refurbished",
-    "Used - Excellent",
-    "Used - Very Good",
-    "Used - Good",
-    "Used - Acceptable",
     "For Parts or Not Working"
   ]
   
@@ -943,11 +943,11 @@ export default function ProductSearchPage() {
                     {/* Seller - Read Only */}
                     {productData.seller && (
                       <div>
-                        <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                        {/* <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">
                           Seller
-                        </h3>
+                        </h3> */}
                         <p className="mt-1 text-gray-900 dark:text-white">
-                          {productData.seller.username}
+                          {/* {productData.seller.username} */}
                           {productData.seller.feedbackPercentage && (
                             <span className="ml-2 text-green-600 dark:text-green-400">
                               ({productData.seller.feedbackPercentage}% positive)
