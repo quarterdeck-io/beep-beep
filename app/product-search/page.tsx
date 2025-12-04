@@ -17,10 +17,6 @@ interface ProductData {
   image?: {
     imageUrl?: string
   }
-  seller?: {
-    // username?: string
-    feedbackPercentage?: string
-  }
   [key: string]: any
 }
 
@@ -939,23 +935,6 @@ export default function ProductSearchPage() {
                         </p>
                       )}
                     </div>
-
-                    {/* Seller - Read Only */}
-                    {productData.seller && (
-                      <div>
-                        {/* <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                          Seller
-                        </h3> */}
-                        <p className="mt-1 text-gray-900 dark:text-white">
-                          {/* {productData.seller.username} */}
-                          {productData.seller.feedbackPercentage && (
-                            <span className="ml-2 text-green-600 dark:text-green-400">
-                              ({productData.seller.feedbackPercentage}% positive)
-                            </span>
-                          )}
-                        </p>
-                      </div>
-                    )}
 
                     {/* Action Buttons */}
                     <div className="flex flex-col sm:flex-row gap-3">
