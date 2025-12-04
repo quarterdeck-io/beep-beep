@@ -411,16 +411,8 @@ export default function SettingsPage() {
               <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
                 Set the initial SKU number for your listings. This will be used as the starting point and incremented for each new listing.
               </p>
-              <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg">
-                <p className="text-sm text-yellow-800 dark:text-yellow-300">
-                  <strong>📌 SKU Format:</strong> All SKUs include "0000" prefix before counter: <span className="font-mono font-bold">{`{Prefix}-0000{Counter}`}</span>
-                </p>
-                <p className="text-xs text-yellow-700 dark:text-yellow-400 mt-1">
-                  Example: DVD-00001, DVD-000010, DVD-0000100
-                </p>
-              </div>
               
-              <div className="inline-block px-4 py-2 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 rounded-md font-medium">
+              <div className="inline-block px-4 py-2 mb-3 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 rounded-md font-medium">
                 Next SKU Counter: {nextSkuCounter}
               </div>
 
@@ -449,7 +441,7 @@ export default function SettingsPage() {
                 SKU Prefix Override
               </h3>
               
-              <div className="inline-block px-4 py-2 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 rounded-md font-medium">
+              <div className="inline-block px-4 py-2 mb-3 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 rounded-md font-medium">
                 Current Prefix: {skuPrefix || "SKU (default)"}
               </div>
 
