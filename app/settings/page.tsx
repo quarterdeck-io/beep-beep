@@ -420,33 +420,8 @@ export default function SettingsPage() {
                 </p>
               </div>
               
-              <div className="mb-4 space-y-3">
-                <div className="inline-block px-4 py-2 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 rounded-md font-medium">
-                  Next SKU Counter: {nextSkuCounter}
-                </div>
-                <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                  <p className="text-sm font-medium text-blue-900 dark:text-blue-300 mb-2">
-                    Next SKU Format Preview:
-                  </p>
-                  <p className="text-2xl font-bold text-blue-700 dark:text-blue-400 font-mono">
-                    {skuPrefix || "SKU"}-0000{nextSkuCounter}
-                  </p>
-                  <p className="text-xs text-blue-600 dark:text-blue-400 mt-3">
-                    Format: <span className="font-mono">{`{Prefix}-0000{Counter}`}</span> ("0000" prepended to counter)
-                  </p>
-                  <div className="mt-3 pt-3 border-t border-blue-200 dark:border-blue-700">
-                    <p className="text-xs font-medium text-blue-800 dark:text-blue-300 mb-2">Examples:</p>
-                    <div className="grid grid-cols-2 gap-2 text-xs text-blue-700 dark:text-blue-400 font-mono">
-                      <div>Counter 1: <strong>{skuPrefix || "SKU"}-00001</strong></div>
-                      <div>Counter 10: <strong>{skuPrefix || "SKU"}-000010</strong></div>
-                      <div>Counter 100: <strong>{skuPrefix || "SKU"}-0000100</strong></div>
-                      <div>Counter 1000: <strong>{skuPrefix || "SKU"}-00001000</strong></div>
-                    </div>
-                    <p className="text-xs text-blue-600 dark:text-blue-500 mt-2 italic">
-                      ✓ "0000" (4 zeros) is prepended to the counter in all SKUs
-                    </p>
-                  </div>
-                </div>
+              <div className="inline-block px-4 py-2 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 rounded-md font-medium">
+                Next SKU Counter: {nextSkuCounter}
               </div>
 
               <div className="flex gap-3">
@@ -474,25 +449,8 @@ export default function SettingsPage() {
                 SKU Prefix Override
               </h3>
               
-              <div className="mb-4 space-y-3">
-                <div className="inline-block px-4 py-2 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 rounded-md font-medium">
-                  Current Prefix: {skuPrefix || "SKU (default)"}
-                </div>
-                <div className="p-3 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-lg">
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                    Example SKUs with this prefix:
-                  </p>
-                  <div className="flex gap-3 text-sm font-mono">
-                    <span className="text-gray-900 dark:text-white font-bold">{skuPrefix || "SKU"}-00001</span>
-                    <span className="text-gray-400">→</span>
-                    <span className="text-gray-900 dark:text-white font-bold">{skuPrefix || "SKU"}-00002</span>
-                    <span className="text-gray-400">→</span>
-                    <span className="text-gray-900 dark:text-white font-bold">{skuPrefix || "SKU"}-00003</span>
-                  </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-500 mt-2">
-                    All SKUs have "0000" (4 zeros) prepended to the counter
-                  </p>
-                </div>
+              <div className="inline-block px-4 py-2 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 rounded-md font-medium">
+                Current Prefix: {skuPrefix || "SKU (default)"}
               </div>
 
               <div className="flex gap-3 mb-2">
