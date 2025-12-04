@@ -357,9 +357,11 @@ export default function SettingsPage() {
                   </button>
                 </div>
                 {searchQuery && (
-                  <div className="mt-3 text-sm text-gray-600 dark:text-gray-400">
-                    <p>Current SKU Format: <strong className="text-gray-900 dark:text-white">{skuPrefix || "SKU"}-{nextSkuCounter}</strong></p>
-                    <p className="mt-1">Next SKU will be: <strong className="text-gray-900 dark:text-white">{skuPrefix || "SKU"}-{nextSkuCounter}</strong></p>
+                  <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded text-sm text-gray-600 dark:text-gray-400">
+                    <p>Current Prefix: <strong className="text-gray-900 dark:text-white">{skuPrefix || "SKU (default)"}</strong></p>
+                    <p className="mt-1">Current Counter: <strong className="text-gray-900 dark:text-white">{nextSkuCounter}</strong></p>
+                    <p className="mt-1">Next SKU will be: <strong className="text-blue-600 dark:text-blue-400 text-lg">{skuPrefix || "SKU"}-{nextSkuCounter.toString().padStart(4, '0')}</strong></p>
+                    <p className="mt-1 text-xs text-gray-500">Format: {`{Prefix}-{4-digit counter}`}</p>
                   </div>
                 )}
               </div>
@@ -406,13 +408,41 @@ export default function SettingsPage() {
               <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
                 Initial SKU Number
               </h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
                 Set the initial SKU number for your listings. This will be used as the starting point and incremented for each new listing.
               </p>
+              <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg">
+                <p className="text-sm text-yellow-800 dark:text-yellow-300">
+                  <strong>📌 Default Format:</strong> All SKUs are padded with "000" prefix automatically (e.g., 1 → 0001, 15 → 0015)
+                </p>
+              </div>
               
-              <div className="mb-4">
+              <div className="mb-4 space-y-3">
                 <div className="inline-block px-4 py-2 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 rounded-md font-medium">
                   Next SKU Counter: {nextSkuCounter}
+                </div>
+                <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                  <p className="text-sm font-medium text-blue-900 dark:text-blue-300 mb-2">
+                    Next SKU Format Preview:
+                  </p>
+                  <p className="text-2xl font-bold text-blue-700 dark:text-blue-400 font-mono">
+                    {skuPrefix || "SKU"}-{nextSkuCounter.toString().padStart(4, '0')}
+                  </p>
+                  <p className="text-xs text-blue-600 dark:text-blue-400 mt-3">
+                    Format: <span className="font-mono">{`{Prefix}-000{Counter}`}</span> (4-digit padding)
+                  </p>
+                  <div className="mt-3 pt-3 border-t border-blue-200 dark:border-blue-700">
+                    <p className="text-xs font-medium text-blue-800 dark:text-blue-300 mb-2">Examples:</p>
+                    <div className="grid grid-cols-2 gap-2 text-xs text-blue-700 dark:text-blue-400 font-mono">
+                      <div>Counter 1: <strong>{skuPrefix || "SKU"}-0001</strong></div>
+                      <div>Counter 10: <strong>{skuPrefix || "SKU"}-0010</strong></div>
+                      <div>Counter 100: <strong>{skuPrefix || "SKU"}-0100</strong></div>
+                      <div>Counter 1000: <strong>{skuPrefix || "SKU"}-1000</strong></div>
+                    </div>
+                    <p className="text-xs text-blue-600 dark:text-blue-500 mt-2 italic">
+                      ✓ "000" prefix is automatically added to all counters below 1000
+                    </p>
+                  </div>
                 </div>
               </div>
 
@@ -441,9 +471,24 @@ export default function SettingsPage() {
                 SKU Prefix Override
               </h3>
               
-              <div className="mb-4">
+              <div className="mb-4 space-y-3">
                 <div className="inline-block px-4 py-2 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 rounded-md font-medium">
-                  Current Prefix: {skuPrefix || "Auto-detection"}
+                  Current Prefix: {skuPrefix || "SKU (default)"}
+                </div>
+                <div className="p-3 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-lg">
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                    Example SKUs with this prefix:
+                  </p>
+                  <div className="flex gap-3 text-sm font-mono">
+                    <span className="text-gray-900 dark:text-white font-bold">{skuPrefix || "SKU"}-0001</span>
+                    <span className="text-gray-400">→</span>
+                    <span className="text-gray-900 dark:text-white font-bold">{skuPrefix || "SKU"}-0002</span>
+                    <span className="text-gray-400">→</span>
+                    <span className="text-gray-900 dark:text-white font-bold">{skuPrefix || "SKU"}-0003</span>
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-500 mt-2">
+                    All SKUs include "000" padding by default
+                  </p>
                 </div>
               </div>
 

@@ -264,12 +264,15 @@ export async function POST(req: Request) {
       console.warn("SKU settings not available, using default:", error)
     }
 
-    // Generate SKU using user's settings with timestamp for uniqueness
+    // Generate SKU using user's settings: {Prefix}-000{counter}
+    // Default format ensures "000" prefix is always present for counters below 1000
     const prefix = skuSettings.skuPrefix || "SKU"
-    const timestamp = Date.now().toString().slice(-6) // Last 6 digits of timestamp for uniqueness
-    const sku = `${prefix}-${skuSettings.nextSkuCounter}-${timestamp}`
+    // Pad counter with leading zeros to 4 digits (e.g., 1 -> 0001, 15 -> 0015, 123 -> 0123, 1000 -> 1000)
+    // This ensures the "000" prefix is visible by default as per requirement
+    const paddedCounter = skuSettings.nextSkuCounter.toString().padStart(4, '0')
+    const sku = `${prefix}-${paddedCounter}`
     
-    console.log("Generated unique SKU:", sku)
+    console.log("Generated SKU:", sku, `(Counter: ${skuSettings.nextSkuCounter}, Format: ${prefix}-000X)`)
     
     // Increment the counter for next time (we'll update it after successful listing)
 
