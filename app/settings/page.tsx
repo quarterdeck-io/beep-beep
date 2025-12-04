@@ -360,8 +360,8 @@ export default function SettingsPage() {
                   <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded text-sm text-gray-600 dark:text-gray-400">
                     <p>Current Prefix: <strong className="text-gray-900 dark:text-white">{skuPrefix || "SKU (default)"}</strong></p>
                     <p className="mt-1">Current Counter: <strong className="text-gray-900 dark:text-white">{nextSkuCounter}</strong></p>
-                    <p className="mt-1">Next SKU will be: <strong className="text-blue-600 dark:text-blue-400 text-lg font-mono">{skuPrefix || "SKU"}-000{nextSkuCounter}</strong></p>
-                    <p className="mt-1 text-xs text-gray-500">Format: <span className="font-mono">{`{Prefix}-000{Counter}`}</span> (000 prepended)</p>
+                    <p className="mt-1">Next SKU will be: <strong className="text-blue-600 dark:text-blue-400 text-lg font-mono">{skuPrefix || "SKU"}-0000{nextSkuCounter}</strong></p>
+                    <p className="mt-1 text-xs text-gray-500">Format: <span className="font-mono">{`{Prefix}-0000{Counter}`}</span> (0000 prepended)</p>
                   </div>
                 )}
               </div>
@@ -413,10 +413,10 @@ export default function SettingsPage() {
               </p>
               <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg">
                 <p className="text-sm text-yellow-800 dark:text-yellow-300">
-                  <strong>📌 SKU Format:</strong> All SKUs include "000" prefix before counter: <span className="font-mono font-bold">{`{Prefix}-000{Counter}`}</span>
+                  <strong>📌 SKU Format:</strong> All SKUs include "0000" prefix before counter: <span className="font-mono font-bold">{`{Prefix}-0000{Counter}`}</span>
                 </p>
                 <p className="text-xs text-yellow-700 dark:text-yellow-400 mt-1">
-                  Example: DVD-0001, DVD-00010, DVD-000100
+                  Example: DVD-00001, DVD-000010, DVD-0000100
                 </p>
               </div>
               
@@ -429,21 +429,21 @@ export default function SettingsPage() {
                     Next SKU Format Preview:
                   </p>
                   <p className="text-2xl font-bold text-blue-700 dark:text-blue-400 font-mono">
-                    {skuPrefix || "SKU"}-000{nextSkuCounter}
+                    {skuPrefix || "SKU"}-0000{nextSkuCounter}
                   </p>
                   <p className="text-xs text-blue-600 dark:text-blue-400 mt-3">
-                    Format: <span className="font-mono">{`{Prefix}-000{Counter}`}</span> ("000" prepended to counter)
+                    Format: <span className="font-mono">{`{Prefix}-0000{Counter}`}</span> ("0000" prepended to counter)
                   </p>
                   <div className="mt-3 pt-3 border-t border-blue-200 dark:border-blue-700">
                     <p className="text-xs font-medium text-blue-800 dark:text-blue-300 mb-2">Examples:</p>
                     <div className="grid grid-cols-2 gap-2 text-xs text-blue-700 dark:text-blue-400 font-mono">
-                      <div>Counter 1: <strong>{skuPrefix || "SKU"}-0001</strong></div>
-                      <div>Counter 10: <strong>{skuPrefix || "SKU"}-00010</strong></div>
-                      <div>Counter 100: <strong>{skuPrefix || "SKU"}-000100</strong></div>
-                      <div>Counter 1000: <strong>{skuPrefix || "SKU"}-0001000</strong></div>
+                      <div>Counter 1: <strong>{skuPrefix || "SKU"}-00001</strong></div>
+                      <div>Counter 10: <strong>{skuPrefix || "SKU"}-000010</strong></div>
+                      <div>Counter 100: <strong>{skuPrefix || "SKU"}-0000100</strong></div>
+                      <div>Counter 1000: <strong>{skuPrefix || "SKU"}-00001000</strong></div>
                     </div>
                     <p className="text-xs text-blue-600 dark:text-blue-500 mt-2 italic">
-                      ✓ "000" is prepended to the counter in all SKUs
+                      ✓ "0000" (4 zeros) is prepended to the counter in all SKUs
                     </p>
                   </div>
                 </div>
@@ -483,14 +483,14 @@ export default function SettingsPage() {
                     Example SKUs with this prefix:
                   </p>
                   <div className="flex gap-3 text-sm font-mono">
-                    <span className="text-gray-900 dark:text-white font-bold">{skuPrefix || "SKU"}-0001</span>
+                    <span className="text-gray-900 dark:text-white font-bold">{skuPrefix || "SKU"}-00001</span>
                     <span className="text-gray-400">→</span>
-                    <span className="text-gray-900 dark:text-white font-bold">{skuPrefix || "SKU"}-0002</span>
+                    <span className="text-gray-900 dark:text-white font-bold">{skuPrefix || "SKU"}-00002</span>
                     <span className="text-gray-400">→</span>
-                    <span className="text-gray-900 dark:text-white font-bold">{skuPrefix || "SKU"}-0003</span>
+                    <span className="text-gray-900 dark:text-white font-bold">{skuPrefix || "SKU"}-00003</span>
                   </div>
                   <p className="text-xs text-gray-500 dark:text-gray-500 mt-2">
-                    All SKUs have "000" prepended to the counter
+                    All SKUs have "0000" (4 zeros) prepended to the counter
                   </p>
                 </div>
               </div>
@@ -513,7 +513,7 @@ export default function SettingsPage() {
               </div>
 
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                Set your custom SKU prefix (e.g., DVD, PROD, ITEM). All SKUs will use format: <span className="font-mono font-semibold">{`{Prefix}-000{Counter}`}</span>
+                Set your custom SKU prefix (e.g., DVD, PROD, ITEM). All SKUs will use format: <span className="font-mono font-semibold">{`{Prefix}-0000{Counter}`}</span>
               </p>
             </div>
           </div>

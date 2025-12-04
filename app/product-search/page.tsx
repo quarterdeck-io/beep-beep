@@ -17,10 +17,6 @@ interface ProductData {
   image?: {
     imageUrl?: string
   }
-  seller?: {
-    // username?: string
-    feedbackPercentage?: string
-  }
   [key: string]: any
 }
 
@@ -56,6 +52,10 @@ export default function ProductSearchPage() {
   const [aspectDefinitions, setAspectDefinitions] = useState<any[]>([])
   const [userProvidedAspects, setUserProvidedAspects] = useState<Record<string, string>>({})
   const [showAspectForm, setShowAspectForm] = useState(false)
+  
+  // SKU Preview state
+  const [skuPreview, setSkuPreview] = useState<string>("")
+  const [loadingSku, setLoadingSku] = useState(false)
   
   // Available conditions for dropdown
   const conditions = [
@@ -121,6 +121,8 @@ export default function ProductSearchPage() {
       setIsEditing(false)
       setListingSuccess(null)
       setListingError(null)
+      // Fetch SKU preview for this listing
+      fetchSkuPreview()
     } catch (err: any) {
       setError(err.message || "Failed to search product")
     } finally {
@@ -177,6 +179,26 @@ export default function ProductSearchPage() {
     setUserProvidedAspects({})
     setShowAspectForm(false)
     setError("")
+    setSkuPreview("") // Clear SKU preview
+  }
+  
+  // Fetch SKU preview for the next listing
+  const fetchSkuPreview = async () => {
+    setLoadingSku(true)
+    try {
+      const res = await fetch("/api/settings/sku")
+      if (res.ok) {
+        const data = await res.json()
+        const prefix = data.skuPrefix || "SKU"
+        const counter = data.nextSkuCounter || 1
+        const preview = `${prefix}-0000${counter}`
+        setSkuPreview(preview)
+      }
+    } catch (error) {
+      console.error("Failed to fetch SKU preview:", error)
+    } finally {
+      setLoadingSku(false)
+    }
   }
   
   const handleListOnEbay = async (additionalAspects?: Record<string, string>) => {
@@ -1002,14 +1024,24 @@ export default function ProductSearchPage() {
                       )}
                     </div>
 
-                    {/* Seller - Read Only */}
-                    {productData.seller && productData.seller.feedbackPercentage && (
-                        <p className="mt-1 text-gray-900 dark:text-white">
-                          <span className="text-green-600 dark:text-green-400 font-semibold">
-                            {productData.seller.feedbackPercentage}% positive
-                          </span>
+                    {/* SKU Preview */}
+                    <div className="p-4 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border border-purple-200 dark:border-purple-700 rounded-lg">
+                      <h3 className="text-sm font-medium text-purple-900 dark:text-purple-300 mb-2">
+                        SKU Preview
+                      </h3>
+                      {loadingSku ? (
+                        <p className="text-sm text-purple-600 dark:text-purple-400">Loading...</p>
+                      ) : skuPreview ? (
+                        <p className="text-2xl font-bold text-purple-700 dark:text-purple-400 font-mono">
+                          {skuPreview}
                         </p>
-                    )}
+                      ) : (
+                        <p className="text-sm text-purple-600 dark:text-purple-400">No SKU available</p>
+                      )}
+                      <p className="text-xs text-purple-600 dark:text-purple-400 mt-2">
+                        This SKU will be assigned when you list this product
+                      </p>
+                    </div>
 
                     {/* Action Buttons */}
                     <div className="flex flex-col sm:flex-row gap-3 mt-6">
