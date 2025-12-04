@@ -300,7 +300,7 @@ export default function SettingsPage() {
       <div className="max-w-4xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-            Electron Settings
+            Beep Beep Settings
           </h1>
           <p className="text-gray-600 dark:text-gray-400 mb-6">
             Configure your eBay business policies and listing settings before creating listings.

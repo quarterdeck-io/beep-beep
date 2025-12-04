@@ -934,7 +934,8 @@ export default function ProductSearchPage() {
             )}
           </div>
           
-          {productData && (
+          {/* Show product details only if NOT a duplicate */}
+          {productData && !isDuplicate && (
             <>
               {/* SKU Preview */}
               <div className="mb-6">
