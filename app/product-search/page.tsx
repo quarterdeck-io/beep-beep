@@ -163,6 +163,7 @@ export default function ProductSearchPage() {
   const handleClearProduct = () => {
     // Clear all product-related state
     setProductData(null)
+    setUpc("") // Clear UPC from search bar
     setEditedTitle("")
     setEditedDescription("")
     setEditedCondition("")
@@ -861,17 +862,6 @@ export default function ProductSearchPage() {
                   <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
                     Product Information
                   </h2>
-                  <div className="flex flex-wrap gap-3 text-xs text-gray-500 dark:text-gray-400">
-                    <p className="flex items-center gap-1">
-                      <kbd className="px-2 py-1 text-xs font-semibold text-gray-800 bg-gray-100 border border-gray-200 rounded dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600">SPACE</kbd>
-                      <span>List on eBay</span>
-                    </p>
-                    <span className="text-gray-300 dark:text-gray-600">•</span>
-                    <p className="flex items-center gap-1">
-                      <kbd className="px-2 py-1 text-xs font-semibold text-gray-800 bg-gray-100 border border-gray-200 rounded dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600">ESC</kbd>
-                      <span>Clear</span>
-                    </p>
-                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
