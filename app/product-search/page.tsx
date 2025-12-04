@@ -217,7 +217,7 @@ export default function ProductSearchPage() {
   }
   
   // Fetch SKU preview for the next listing
-  const fetchSkuPreview = async () => {
+  const fetchSkuPreview = async (updatePreviousSku = true) => {
     setLoadingSku(true)
     try {
       const res = await fetch("/api/settings/sku")
@@ -228,13 +228,15 @@ export default function ProductSearchPage() {
         const preview = `${prefix}-0000${counter}`
         setSkuPreview(preview)
         
-        // Also set the previous SKU (last listed product)
-        if (counter > 1) {
-          const previousCounter = counter - 1
-          const previousSku = `${prefix}-0000${previousCounter}`
-          setListedSku(previousSku)
-        } else {
-          setListedSku(null) // No previous SKU if this is the first one
+        // Also set the previous SKU (last listed product) if requested
+        if (updatePreviousSku) {
+          if (counter > 1) {
+            const previousCounter = counter - 1
+            const previousSku = `${prefix}-0000${previousCounter}`
+            setListedSku(previousSku)
+          } else {
+            setListedSku(null) // No previous SKU if this is the first one
+          }
         }
       }
     } catch (error) {
@@ -415,9 +417,12 @@ export default function ProductSearchPage() {
       }
       
       setListingSuccess(data.listingUrl || data.message || "Product listed successfully!")
-      // Refresh SKU preview to show the next available SKU
-      // This will also update the previous SKU automatically
-      fetchSkuPreview()
+      // Capture the SKU that was used for this listing
+      if (data.sku) {
+        setListedSku(data.sku)
+      }
+      // Refresh SKU preview to show the next available SKU (but don't update previous SKU)
+      fetchSkuPreview(false)
       setIsEditing(false)
     } catch (err: any) {
       setListingError(err.message || "Failed to list product on eBay")
@@ -716,6 +721,24 @@ export default function ProductSearchPage() {
         handleClearProduct()
       }
       
+      // Handle aspect form keyboard shortcuts
+      if (showAspectForm) {
+        // Space to confirm/submit aspects
+        if (e.key === " " && 
+            !(e.target instanceof HTMLInputElement) &&
+            !(e.target instanceof HTMLTextAreaElement) &&
+            !(e.target instanceof HTMLSelectElement)) {
+          e.preventDefault()
+          handleSubmitAspects()
+        }
+        // Escape to cancel aspect form
+        if (e.key === "Escape") {
+          setShowAspectForm(false)
+          setMissingAspects([])
+          setUserProvidedAspects({})
+        }
+      }
+      
       // List on eBay with spacebar:
       // 1. Spacebar is pressed
       // 2. Product data exists
@@ -814,28 +837,6 @@ export default function ProductSearchPage() {
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-6">
             Product Search
           </h1>
-
-          {/* Duplicate Warning Banner - TOP OF PAGE */}
-          {productData && isDuplicate && duplicateSku && (
-            <div className="mb-6 bg-red-50 dark:bg-red-900/30 border-2 border-red-400 dark:border-red-600 rounded-lg p-6 shadow-lg">
-              <div className="flex items-start gap-3">
-                <svg className="w-8 h-8 text-yellow-500 shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-                <div className="flex-1">
-                  <h3 className="text-2xl font-bold text-red-700 dark:text-red-400 mb-2">
-                    DUPLICATE SKU: {duplicateSku}
-                  </h3>
-                  <p className="text-red-600 dark:text-red-300 mb-2">
-                    An item with the same UPC <span className="font-mono font-semibold">{upc}</span> already exists in your eBay inventory.
-                  </p>
-                  <p className="text-red-600 dark:text-red-300">
-                    This may indicate you already have this item listed. Please review carefully before proceeding.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
 
           <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6 mb-6">
             <form onSubmit={handleSearch} className="space-y-4">
@@ -1247,6 +1248,11 @@ export default function ProductSearchPage() {
                           </svg>
                           <div>
                             <p className="font-semibold">Success!</p>
+                            {listedSku && (
+                              <p className="font-mono text-sm font-semibold my-1">
+                                {listedSku}
+                              </p>
+                            )}
                             <p>{listingSuccess}</p>
                           </div>
                         </div>
@@ -1319,6 +1325,18 @@ export default function ProductSearchPage() {
                                   </div>
                                 )
                               })}
+                            </div>
+                            
+                            {/* Keyboard Shortcut Hint */}
+                            <div className="flex items-center gap-2 mt-4 text-sm text-gray-600 dark:text-gray-400">
+                              <svg className="w-4 h-4 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
+                              </svg>
+                              <span>Use</span>
+                              <kbd className="px-2 py-1 text-xs font-semibold text-gray-800 bg-gray-100 border border-gray-200 rounded-lg dark:bg-gray-700 dark:text-gray-100 dark:border-gray-600">Space</kbd>
+                              <span>to confirm or</span>
+                              <kbd className="px-2 py-1 text-xs font-semibold text-gray-800 bg-gray-100 border border-gray-200 rounded-lg dark:bg-gray-700 dark:text-gray-100 dark:border-gray-600">Escape</kbd>
+                              <span>to cancel</span>
                             </div>
                             
                             <div className="flex gap-3 mt-6">
