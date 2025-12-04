@@ -876,6 +876,25 @@ export default function ProductSearchPage() {
               </div>
             )}
           </div>
+          
+          {/* SKU Preview */}
+          <div className="p-4 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border border-purple-200 dark:border-purple-700 rounded-lg">
+            <h3 className="text-sm font-medium text-purple-900 dark:text-purple-300 mb-2">
+              SKU Preview
+            </h3>
+            {loadingSku ? (
+              <p className="text-sm text-purple-600 dark:text-purple-400">Loading...</p>
+            ) : skuPreview ? (
+              <p className="text-2xl font-bold text-purple-700 dark:text-purple-400 font-mono">
+                {skuPreview}
+              </p>
+            ) : (
+              <p className="text-sm text-purple-600 dark:text-purple-400">No SKU available</p>
+            )}
+            <p className="text-xs text-purple-600 dark:text-purple-400 mt-2">
+              This SKU will be assigned when you list this product
+            </p>
+          </div>
 
           {productData && (
             <div className="bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden">
@@ -1022,25 +1041,6 @@ export default function ProductSearchPage() {
                           {productData.condition || "Not specified"}
                         </p>
                       )}
-                    </div>
-
-                    {/* SKU Preview */}
-                    <div className="p-4 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border border-purple-200 dark:border-purple-700 rounded-lg">
-                      <h3 className="text-sm font-medium text-purple-900 dark:text-purple-300 mb-2">
-                        SKU Preview
-                      </h3>
-                      {loadingSku ? (
-                        <p className="text-sm text-purple-600 dark:text-purple-400">Loading...</p>
-                      ) : skuPreview ? (
-                        <p className="text-2xl font-bold text-purple-700 dark:text-purple-400 font-mono">
-                          {skuPreview}
-                        </p>
-                      ) : (
-                        <p className="text-sm text-purple-600 dark:text-purple-400">No SKU available</p>
-                      )}
-                      <p className="text-xs text-purple-600 dark:text-purple-400 mt-2">
-                        This SKU will be assigned when you list this product
-                      </p>
                     </div>
 
                     {/* Action Buttons */}
