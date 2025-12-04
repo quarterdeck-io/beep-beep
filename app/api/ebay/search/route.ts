@@ -156,13 +156,17 @@ export async function GET(req: Request) {
       ? (prices.reduce((sum: number, price: number) => sum + price, 0) / prices.length).toFixed(2)
       : "0.00"
     
-    // Use first product but with mean price
+    // Select a RANDOM product from the search results
+    const randomIndex = Math.floor(Math.random() * data.itemSummaries.length)
+    const selectedProduct = data.itemSummaries[randomIndex]
+    
+    // Use the random product but replace its price with the mean price
     const product = {
-      ...data.itemSummaries[0],
+      ...selectedProduct,
       price: {
-        ...data.itemSummaries[0].price,
+        ...selectedProduct.price,
         value: meanPrice,
-        currency: data.itemSummaries[0].price?.currency || "USD"
+        currency: selectedProduct.price?.currency || "USD"
       }
     }
     
@@ -171,9 +175,10 @@ export async function GET(req: Request) {
       ...product,
       _searchMetadata: {
         totalResults: data.itemSummaries.length,
+        selectedIndex: randomIndex,
         itemsUsedForMean: prices.length,
         isMeanPrice: true,
-        originalPrice: data.itemSummaries[0].price?.value,
+        originalPrice: selectedProduct.price?.value,
         meanPrice: meanPrice,
         searchQuery: upc
       }
