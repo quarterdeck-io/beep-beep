@@ -205,7 +205,7 @@ export default function ProductSearchPage() {
     setListingLoading(false)
     setListingSuccess(null)
     setListingError(null)
-    setListedSku(null) // Clear previous SKU
+    setListedSku(null) // Clear previous SKU on manual clear
     setMissingAspects([])
     setAspectDefinitions([])
     setUserProvidedAspects({})
@@ -227,6 +227,15 @@ export default function ProductSearchPage() {
         const counter = data.nextSkuCounter || 1
         const preview = `${prefix}-0000${counter}`
         setSkuPreview(preview)
+        
+        // Also set the previous SKU (last listed product)
+        if (counter > 1) {
+          const previousCounter = counter - 1
+          const previousSku = `${prefix}-0000${previousCounter}`
+          setListedSku(previousSku)
+        } else {
+          setListedSku(null) // No previous SKU if this is the first one
+        }
       }
     } catch (error) {
       console.error("Failed to fetch SKU preview:", error)
@@ -406,8 +415,8 @@ export default function ProductSearchPage() {
       }
       
       setListingSuccess(data.listingUrl || data.message || "Product listed successfully!")
-      setListedSku(data.sku || null) // Store the SKU that was just listed
       // Refresh SKU preview to show the next available SKU
+      // This will also update the previous SKU automatically
       fetchSkuPreview()
       setIsEditing(false)
     } catch (err: any) {
