@@ -80,6 +80,24 @@ export default function ProductSearchPage() {
     "For Parts or Not Working"
   ]
   
+  // Helper function to get condition description text
+  const getConditionDescription = (condition: string): string => {
+    const descriptionMap: { [key: string]: string } = {
+      "Brand New": "A brand-new, unused, unopened, undamaged item in its original packaging.",
+      "New Other": "A new, unused item with absolutely no signs of wear. The item may be missing original packaging or protective wrapping, or may be in original packaging but not sealed.",
+      "New with Defects": "A new, unused item with defects or irregularities. The item may have cosmetic imperfections, be a factory second, or be damaged in a way that does not affect its operation.",
+      "Manufacturer Refurbished": "An item that has been restored to working order by the manufacturer. This means the item has been inspected, cleaned, and repaired to meet manufacturer specifications and is in excellent condition.",
+      "Seller Refurbished": "An item that has been restored to working order by the seller or a third party not approved by the manufacturer. This means the item has been inspected, cleaned, and repaired to full working order and is in excellent condition.",
+      "Used - Excellent": "An item that has been used but is in excellent condition with no noticeable cosmetic or functional defects. The item may show minimal signs of use.",
+      "Used - Very Good": "An item that has been used but remains in very good condition. The item shows some limited signs of wear but is fully functional with no defects.",
+      "Used - Good": "An item that has been used and shows signs of wear. The item is fully functional but may have cosmetic issues such as scratches, scuffs, or minor marks.",
+      "Used - Acceptable": "An item that has been used with obvious signs of wear. The item is fully functional but may have significant cosmetic defects.",
+      "For Parts or Not Working": "An item that does not function as intended or is not fully operational. This item may be used for replacement parts or requires repair.",
+    }
+    
+    return descriptionMap[condition] || ""
+  }
+  
   // Helper function to add debug log
   const addDebugLog = (message: string) => {
     const timestamp = new Date().toLocaleTimeString()
@@ -959,7 +977,7 @@ export default function ProductSearchPage() {
                       {listedSku}
                     </p>
                     <p className="text-xs text-green-600 dark:text-green-400 mt-2">
-                      {listingSuccess ? "This SKU was assigned to the product you just listed" : "This SKU was assigned to your last listed product"}
+                      {loadingSku ? "This SKU was assigned to the product you just listed" : "This SKU was assigned to your last listed product"}
                     </p>
                   </div>
                 </div>
@@ -1119,21 +1137,35 @@ export default function ProductSearchPage() {
                         Condition
                       </h3>
                       {isEditing ? (
-                        <select
-                          value={editedCondition}
-                          onChange={(e) => setEditedCondition(e.target.value)}
-                          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                        >
-                          {conditions.map((condition) => (
-                            <option key={condition} value={condition}>
-                              {condition}
-                            </option>
-                          ))}
-                        </select>
+                        <div>
+                          <select
+                            value={editedCondition}
+                            onChange={(e) => setEditedCondition(e.target.value)}
+                            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                          >
+                            {conditions.map((condition) => (
+                              <option key={condition} value={condition}>
+                                {condition}
+                              </option>
+                            ))}
+                          </select>
+                          {editedCondition && getConditionDescription(editedCondition) && (
+                            <p className="mt-2 text-xs text-blue-600 dark:text-blue-400 italic">
+                              {getConditionDescription(editedCondition)}
+                            </p>
+                          )}
+                        </div>
                       ) : (
-                        <p className="mt-1 text-gray-900 dark:text-white">
-                          {productData.condition || "Not specified"}
-                        </p>
+                        <div>
+                          <p className="mt-1 text-gray-900 dark:text-white font-semibold">
+                            {productData.condition || "Not specified"}
+                          </p>
+                          {productData.condition && getConditionDescription(productData.condition) && (
+                            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400 italic">
+                              {getConditionDescription(productData.condition)}
+                            </p>
+                          )}
+                        </div>
                       )}
                     </div>
 
