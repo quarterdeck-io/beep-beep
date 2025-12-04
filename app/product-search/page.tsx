@@ -46,6 +46,7 @@ export default function ProductSearchPage() {
   const [listingLoading, setListingLoading] = useState(false)
   const [listingSuccess, setListingSuccess] = useState<string | null>(null)
   const [listingError, setListingError] = useState<string | null>(null)
+  const [listedSku, setListedSku] = useState<string | null>(null)
   
   // Missing item specifics state
   const [missingAspects, setMissingAspects] = useState<string[]>([])
@@ -106,6 +107,7 @@ export default function ProductSearchPage() {
   const performSearch = async (searchValue: string) => {
     setError("")
     setProductData(null)
+    setListedSku(null) // Clear previous listing SKU
     setLoading(true)
 
     try {
@@ -186,6 +188,7 @@ export default function ProductSearchPage() {
     setListingLoading(false)
     setListingSuccess(null)
     setListingError(null)
+    setListedSku(null) // Clear listed SKU
     setMissingAspects([])
     setAspectDefinitions([])
     setUserProvidedAspects({})
@@ -386,6 +389,9 @@ export default function ProductSearchPage() {
       }
       
       setListingSuccess(data.listingUrl || data.message || "Product listed successfully!")
+      setListedSku(data.sku || null)
+      // Refresh SKU preview to show the next available SKU
+      fetchSkuPreview()
       setIsEditing(false)
     } catch (err: any) {
       setListingError(err.message || "Failed to list product on eBay")
@@ -942,6 +948,23 @@ export default function ProductSearchPage() {
           {/* Show product details only if NOT a duplicate */}
           {productData && !isDuplicate && (
             <>
+              {/* Previously Listed SKU - Show if product was just listed */}
+              {listedSku && listingSuccess && (
+                <div className="mb-6">
+                  <div className="p-4 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border border-green-300 dark:border-green-700 rounded-lg w-96">
+                    <h3 className="text-sm font-medium text-green-900 dark:text-green-300 mb-2">
+                      Previous SKU Number
+                    </h3>
+                    <p className="text-2xl font-bold text-green-700 dark:text-green-400 font-mono">
+                      {listedSku}
+                    </p>
+                    <p className="text-xs text-green-600 dark:text-green-400 mt-2">
+                      This SKU was assigned to the product you just listed
+                    </p>
+                  </div>
+                </div>
+              )}
+              
               {/* SKU Preview */}
               <div className="mb-6">
                 <div className="p-4 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border border-purple-200 dark:border-purple-700 rounded-lg w-96">
@@ -1180,8 +1203,13 @@ export default function ProductSearchPage() {
                           <svg className="w-5 h-5 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                           </svg>
-                          <div>
+                          <div className="flex-1">
                             <p className="font-semibold">Success!</p>
+                            {listedSku && (
+                              <p className="font-mono text-sm mb-2">
+                                <span className="font-semibold">SKU:</span> {listedSku}
+                              </p>
+                            )}
                             <p>{listingSuccess}</p>
                           </div>
                         </div>
