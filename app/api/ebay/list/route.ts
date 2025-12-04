@@ -475,6 +475,12 @@ export async function POST(req: Request) {
       }
     }
     
+    // Add condition description only for non-new items (eBay requirement)
+    const conditionDesc = getConditionDescription(condition)
+    if (conditionDesc) {
+      inventoryItemPayload.conditionDescription = conditionDesc
+    }
+    
     // Log the payload for debugging
     console.log("Creating inventory item with payload:", JSON.stringify(inventoryItemPayload, null, 2))
     
@@ -1411,5 +1417,25 @@ function mapConditionToEbay(condition: string): string {
   }
   
   return conditionMap[condition] || "NEW"
+}
+
+// Helper function to get condition description text
+// Note: eBay ignores conditionDescription for brand new items (NEW condition)
+function getConditionDescription(condition: string): string {
+  const descriptionMap: { [key: string]: string } = {
+    // Brand New items should not include conditionDescription per eBay API guidelines
+    "Brand New": "",
+    "New Other": "A new, unused item with absolutely no signs of wear. The item may be missing original packaging or protective wrapping, or may be in original packaging but not sealed.",
+    "New with Defects": "A new, unused item with defects or irregularities. The item may have cosmetic imperfections, be a factory second, or be damaged in a way that does not affect its operation.",
+    "Manufacturer Refurbished": "An item that has been restored to working order by the manufacturer. This means the item has been inspected, cleaned, and repaired to meet manufacturer specifications and is in excellent condition.",
+    "Seller Refurbished": "An item that has been restored to working order by the seller or a third party not approved by the manufacturer. This means the item has been inspected, cleaned, and repaired to full working order and is in excellent condition.",
+    "Used - Excellent": "An item that has been used but is in excellent condition with no noticeable cosmetic or functional defects. The item may show minimal signs of use.",
+    "Used - Very Good": "An item that has been used but remains in very good condition. The item shows some limited signs of wear but is fully functional with no defects.",
+    "Used - Good": "An item that has been used and shows signs of wear. The item is fully functional but may have cosmetic issues such as scratches, scuffs, or minor marks.",
+    "Used - Acceptable": "An item that has been used with obvious signs of wear. The item is fully functional but may have significant cosmetic defects.",
+    "For Parts or Not Working": "An item that does not function as intended or is not fully operational. This item may be used for replacement parts or requires repair.",
+  }
+  
+  return descriptionMap[condition] || ""
 }
 
