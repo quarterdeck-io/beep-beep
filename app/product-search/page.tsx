@@ -778,6 +778,28 @@ export default function ProductSearchPage() {
             Product Search
           </h1>
 
+          {/* Duplicate Warning Banner - TOP OF PAGE */}
+          {productData && isDuplicate && duplicateSku && (
+            <div className="mb-6 bg-red-50 dark:bg-red-900/30 border-2 border-red-400 dark:border-red-600 rounded-lg p-6 shadow-lg">
+              <div className="flex items-start gap-3">
+                <svg className="w-8 h-8 text-yellow-500 shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <div className="flex-1">
+                  <h3 className="text-2xl font-bold text-red-700 dark:text-red-400 mb-2">
+                    DUPLICATE SKU: {duplicateSku}
+                  </h3>
+                  <p className="text-red-600 dark:text-red-300 mb-2">
+                    An item with the same UPC <span className="font-mono font-semibold">{upc}</span> already exists in your eBay inventory.
+                  </p>
+                  <p className="text-red-600 dark:text-red-300">
+                    This may indicate you already have this item listed. Please review carefully before proceeding.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6 mb-6">
             <form onSubmit={handleSearch} className="space-y-4">
               <div>
@@ -933,36 +955,6 @@ export default function ProductSearchPage() {
                     This SKU will be assigned when you list this product
                   </p>
                 </div>
-                
-                {/* Duplicate Error Block - Near SKU Preview */}
-                {checkingDuplicate && (
-                  <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                    <p className="text-sm text-blue-600 dark:text-blue-400">
-                      Checking for duplicates...
-                    </p>
-                  </div>
-                )}
-                
-                {isDuplicate && duplicateSku && (
-                  <div className="mt-3 p-4 bg-red-50 dark:bg-red-900/40 border-2 border-red-500 dark:border-red-600 rounded-lg shadow-lg">
-                    <div className="flex items-start gap-3">
-                      <svg className="w-7 h-7 text-yellow-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                      </svg>
-                      <div className="flex-1">
-                        <p className="text-lg font-bold text-red-700 dark:text-red-400 mb-2">
-                          ⛔ DUPLICATE SKU: {duplicateSku}
-                        </p>
-                        <p className="text-sm text-red-600 dark:text-red-300 mb-1">
-                          An item with UPC <span className="font-mono font-semibold">{upc}</span> already exists in your eBay inventory.
-                        </p>
-                        <p className="text-sm font-semibold text-red-700 dark:text-red-400 mt-2">
-                          ❌ Duplicates are not allowed. This item cannot be listed.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
               </div>
 
               <div className="bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden">
