@@ -1045,21 +1045,30 @@ export default function ProductSearchPage() {
           
           {/* Duplicate Warning Banner */}
           {hasDuplicates && productData && duplicateSku && (
-            <div className="mt-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-700 rounded-lg">
-              <div className="flex items-start gap-3">
-                <svg className="w-6 h-6 shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M12 2L2 22h20L12 2z" fill="#FCD34D" stroke="#000000" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  <path d="M12 8v4M12 16h.01" stroke="#000000" strokeWidth="2.5" strokeLinecap="round"/>
-                </svg>
+            <div className="mt-6 p-6 bg-red-50 dark:bg-red-900/20 border-2 border-red-400 dark:border-red-600 rounded-lg shadow-lg">
+              <div className="flex items-start gap-4">
+                <div className="shrink-0">
+                  <svg className="w-8 h-8 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                </div>
                 <div className="flex-1">
-                  <h3 className="text-lg font-bold text-red-700 dark:text-red-400 mb-2">
-                    DUPLICATE SKU: {duplicateSku}
+                  <h3 className="text-xl font-bold text-red-700 dark:text-red-400 mb-3 flex items-center gap-2">
+                    <span>⚠️ Duplicate Notice</span>
                   </h3>
-                  <p className="text-sm text-red-600 dark:text-red-300 mb-1">
-                    An item with the same UPC <span className="font-mono font-semibold">{duplicateUpc || upc}</span> already exists in your eBay inventory.
+                  <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-red-200 dark:border-red-800 mb-3">
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
+                      Existing Listing SKU:
+                    </p>
+                    <p className="text-2xl font-bold text-red-700 dark:text-red-400 font-mono">
+                      {duplicateSku}
+                    </p>
+                  </div>
+                  <p className="text-sm text-red-600 dark:text-red-300 mb-2">
+                    <span className="font-semibold">UPC:</span> <span className="font-mono font-semibold">{duplicateUpc || upc}</span>
                   </p>
                   <p className="text-sm text-red-600 dark:text-red-300">
-                    This may indicate you already have this item listed. Please review carefully before proceeding.
+                    A product with this UPC is already listed in your eBay inventory with the SKU shown above. Please review carefully before creating a duplicate listing.
                   </p>
                 </div>
               </div>
