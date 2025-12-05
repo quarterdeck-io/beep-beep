@@ -133,6 +133,10 @@ export async function GET(req: Request) {
     let next = inventoryData.next
 
     console.log(`📦 Found ${inventoryItems.length} inventory items on first page`)
+    console.log(`📦 Total inventory items: ${inventoryData.total || 'unknown'}`)
+    if (inventoryItems.length > 0) {
+      console.log(`📦 First item SKU: ${inventoryItems[0].sku}`)
+    }
 
     // Helper function to check if item has matching UPC
     const hasMatchingUPC = async (item: any): Promise<{ match: boolean; sku?: string; title?: string }> => {
@@ -154,6 +158,14 @@ export async function GET(req: Request) {
         if (itemResponse.ok) {
           const itemData = await itemResponse.json()
           product = itemData.product
+          console.log(`📦 Fetched full details for SKU ${sku}:`, {
+            hasProduct: !!product,
+            upc: product?.upc,
+            ean: product?.ean,
+            isbn: product?.isbn,
+            gtin: product?.gtin,
+            productIdentifiers: product?.productIdentifiers
+          })
         } else {
           // Fall back to list data if available
           if (!product) {
@@ -161,6 +173,7 @@ export async function GET(req: Request) {
           }
         }
       } catch (fetchError) {
+        console.warn(`⚠️ Error fetching details for SKU ${sku}:`, fetchError)
         // Fall back to list data if available
         if (!product) {
           product = item.product
@@ -168,8 +181,20 @@ export async function GET(req: Request) {
       }
       
       if (!product) {
+        console.log(`⚠️ No product data found for SKU ${sku}`)
         return { match: false }
       }
+      
+      // Log all UPC-related fields for debugging
+      console.log(`🔍 Checking SKU ${sku} for UPC match:`, {
+        searchingFor: originalUpcTrimmed,
+        normalizedSearch: normalizedSearchUPC,
+        productUpc: product.upc,
+        productEan: product.ean,
+        productIsbn: product.isbn,
+        productGtin: product.gtin,
+        productIdentifiers: product.productIdentifiers
+      })
       
       // Helper to check if a value matches our search UPC
       const checkValueMatch = (value: any): boolean => {
@@ -195,48 +220,77 @@ export async function GET(req: Request) {
       }
       
       // Check product.upc array
-      if (product.upc && checkValueMatch(product.upc)) {
-        return { match: true, sku, title: product.title || item.product?.title }
+      if (product.upc) {
+        const upcMatch = checkValueMatch(product.upc)
+        console.log(`  ✓ Checked product.upc: ${JSON.stringify(product.upc)} -> ${upcMatch ? 'MATCH' : 'no match'}`)
+        if (upcMatch) {
+          console.log(`✅ MATCH FOUND in product.upc for SKU ${sku}`)
+          return { match: true, sku, title: product.title || item.product?.title }
+        }
       }
       
       // Check product.ean
-      if (product.ean && checkValueMatch(product.ean)) {
-        return { match: true, sku, title: product.title || item.product?.title }
+      if (product.ean) {
+        const eanMatch = checkValueMatch(product.ean)
+        console.log(`  ✓ Checked product.ean: ${JSON.stringify(product.ean)} -> ${eanMatch ? 'MATCH' : 'no match'}`)
+        if (eanMatch) {
+          console.log(`✅ MATCH FOUND in product.ean for SKU ${sku}`)
+          return { match: true, sku, title: product.title || item.product?.title }
+        }
       }
       
       // Check product.isbn
-      if (product.isbn && checkValueMatch(product.isbn)) {
-        return { match: true, sku, title: product.title || item.product?.title }
+      if (product.isbn) {
+        const isbnMatch = checkValueMatch(product.isbn)
+        console.log(`  ✓ Checked product.isbn: ${JSON.stringify(product.isbn)} -> ${isbnMatch ? 'MATCH' : 'no match'}`)
+        if (isbnMatch) {
+          console.log(`✅ MATCH FOUND in product.isbn for SKU ${sku}`)
+          return { match: true, sku, title: product.title || item.product?.title }
+        }
       }
       
       // Check product.gtin
-      if (product.gtin && checkValueMatch(product.gtin)) {
-        return { match: true, sku, title: product.title || item.product?.title }
+      if (product.gtin) {
+        const gtinMatch = checkValueMatch(product.gtin)
+        console.log(`  ✓ Checked product.gtin: ${JSON.stringify(product.gtin)} -> ${gtinMatch ? 'MATCH' : 'no match'}`)
+        if (gtinMatch) {
+          console.log(`✅ MATCH FOUND in product.gtin for SKU ${sku}`)
+          return { match: true, sku, title: product.title || item.product?.title }
+        }
       }
       
       // Check productIdentifiers array
       const productIdentifiers = product.productIdentifiers || []
       if (Array.isArray(productIdentifiers) && productIdentifiers.length > 0) {
+        console.log(`  ✓ Checking ${productIdentifiers.length} productIdentifiers`)
         for (const identifier of productIdentifiers) {
           if (identifier.type === "UPC" || identifier.type === "UPC_A" || identifier.type === "UPC_E" || 
               identifier.type === "GTIN" || identifier.type === "EAN" || identifier.type === "ISBN") {
             const identifierValue = identifier.value || identifier.identifier
-            if (identifierValue && checkValueMatch(identifierValue)) {
-              return { match: true, sku, title: product.title || item.product?.title }
+            if (identifierValue) {
+              const idMatch = checkValueMatch(identifierValue)
+              console.log(`  ✓ Checked productIdentifiers[${identifier.type}]: ${identifierValue} -> ${idMatch ? 'MATCH' : 'no match'}`)
+              if (idMatch) {
+                console.log(`✅ MATCH FOUND in productIdentifiers[${identifier.type}] for SKU ${sku}`)
+                return { match: true, sku, title: product.title || item.product?.title }
+              }
             }
           }
         }
       }
       
+      console.log(`❌ No match found for SKU ${sku}`)
       return { match: false }
     }
 
     const duplicates: Array<{ sku: string; title: string }> = []
 
     // Check first page
+    console.log(`🔍 Checking ${inventoryItems.length} items on first page for UPC match...`)
     for (const item of inventoryItems) {
       const result = await hasMatchingUPC(item)
       if (result.match && result.sku) {
+        console.log(`✅ Duplicate found! SKU: ${result.sku}, Title: ${result.title}`)
         duplicates.push({
           sku: result.sku,
           title: result.title || "Unknown product"
