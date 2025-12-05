@@ -168,19 +168,6 @@ function EbayConnectContent() {
             )}
           </div>
 
-          <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-6 mb-6">
-            <h3 className="text-lg font-semibold text-yellow-800 dark:text-yellow-400 mb-2">
-              Setup Instructions
-            </h3>
-            <ol className="list-decimal list-inside space-y-2 text-yellow-700 dark:text-yellow-300 text-sm">
-              <li>Create an eBay developer account at developer.ebay.com</li>
-              <li>Create an application to get your Client ID and Client Secret</li>
-              <li>Register your callback URL in eBay Developer Portal to get your RuName (Redirect URL name)</li>
-              <li>Add your credentials (Client ID, Client Secret, and RuName) to the .env.local file</li>
-              <li>Click "Connect eBay Account" above to start the OAuth 2.0 flow</li>
-            </ol>
-          </div>
-
           {isConnected && (
             <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
               <h3 className="text-lg font-semibold text-blue-800 dark:text-blue-400 mb-2">
