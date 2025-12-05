@@ -114,11 +114,12 @@ export async function GET(req: Request) {
     }
 
     const inventoryData = await inventoryResponse.json()
-    const inventoryItems = inventoryData.inventoryItems || []
+    let inventoryItems = inventoryData.inventoryItems || []
+    let next = inventoryData.next
 
-    console.log(`Found ${inventoryItems.length} inventory items, checking for UPC match...`)
+    console.log(`Found ${inventoryItems.length} inventory items on first page, checking for UPC match...`)
 
-    // Check each inventory item for matching UPC
+    // Check first page
     for (const item of inventoryItems) {
       const productUPCs = item.product?.upc || []
       
@@ -131,6 +132,42 @@ export async function GET(req: Request) {
           upc: upc,
           productTitle: item.product?.title || "Unknown product"
         })
+      }
+    }
+
+    // If there are more pages, check them too
+    while (next) {
+      console.log("Fetching next page of inventory items...")
+      const nextResponse = await fetch(next, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+          'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
+        },
+      })
+
+      if (!nextResponse.ok) {
+        console.warn("Failed to fetch next page of inventory items")
+        break
+      }
+
+      const nextData = await nextResponse.json()
+      inventoryItems = nextData.inventoryItems || []
+      next = nextData.next
+
+      // Check this page
+      for (const item of inventoryItems) {
+        const productUPCs = item.product?.upc || []
+        
+        if (productUPCs.includes(upc)) {
+          console.log("DUPLICATE FOUND on subsequent page! SKU:", item.sku, "UPC:", upc)
+          return NextResponse.json({
+            isDuplicate: true,
+            existingSku: item.sku,
+            upc: upc,
+            productTitle: item.product?.title || "Unknown product"
+          })
+        }
       }
     }
 
