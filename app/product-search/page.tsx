@@ -59,19 +59,10 @@ export default function ProductSearchPage() {
   const [loadingSku, setLoadingSku] = useState(false)
   
   // Duplicate detection state
-  const [isDuplicate, setIsDuplicate] = useState(false)
+  const [hasDuplicates, setHasDuplicates] = useState(false)
   const [duplicateSku, setDuplicateSku] = useState<string>("")
+  const [duplicateUpc, setDuplicateUpc] = useState<string>("")
   
-  // Log duplicate state changes
-  useEffect(() => {
-    console.log("📊 isDuplicate state changed:", {
-      isDuplicate,
-      duplicateSku,
-      productData: !!productData,
-      upc,
-      bannerShouldShow: isDuplicate && !!productData
-    })
-  }, [isDuplicate, duplicateSku, productData, upc])
   
   // Mean price tracking state
   const [isMeanPrice, setIsMeanPrice] = useState(false)
@@ -145,8 +136,9 @@ export default function ProductSearchPage() {
     setError("")
     setProductData(null)
     setListingError(null) // Clear any previous listing errors
-    setIsDuplicate(false) // Clear duplicate state for new search
-    setDuplicateSku("") // Clear duplicate SKU for new search
+    setHasDuplicates(false) // Clear duplicate state for new search
+    setDuplicateSku("")
+    setDuplicateUpc("")
     setUpc(trimmedUpc) // Update UPC state for display
     setLoading(true)
 
@@ -173,10 +165,9 @@ export default function ProductSearchPage() {
       setListingSuccess(null) // Clear success message for new search
       // Fetch SKU preview for this listing
       fetchSkuPreview()
-      // Check for duplicate in eBay inventory using the searched UPC
-      console.log("🔍 performSearch: Calling checkForDuplicate with UPC:", trimmedUpc)
-      checkForDuplicate(trimmedUpc).catch((error) => {
-        console.error("❌ performSearch: Duplicate check failed:", error)
+      // Check for duplicates in eBay inventory using the searched UPC
+      checkForDuplicates(trimmedUpc).catch((error) => {
+        console.error("❌ Duplicate check failed:", error)
         // Don't block the user if check fails
       })
     } catch (err: any) {
@@ -238,74 +229,50 @@ export default function ProductSearchPage() {
     setShowAspectForm(false)
     setError("")
     setSkuPreview("") // Clear SKU preview
-    setIsDuplicate(false) // Clear duplicate detection
+    setHasDuplicates(false) // Clear duplicate detection
     setDuplicateSku("")
+    setDuplicateUpc("")
   }
   
-  // Check if product already exists in eBay inventory
-  const checkForDuplicate = async (upcCode: string) => {
-    console.log("🔍 checkForDuplicate called with UPC:", upcCode)
-    
+  // Check if products with this UPC already exist in eBay inventory
+  const checkForDuplicates = async (upcCode: string) => {
     if (!upcCode || upcCode.trim() === "") {
-      console.warn("⚠️ checkForDuplicate: Empty UPC code provided, skipping check")
       return
     }
     
     const trimmedUpc = upcCode.trim()
-    console.log("🔍 checkForDuplicate: Checking UPC:", trimmedUpc)
     
     try {
       const apiUrl = `/api/ebay/check-duplicate?upc=${encodeURIComponent(trimmedUpc)}`
-      console.log("🔍 checkForDuplicate: Fetching from API:", apiUrl)
-      
       const res = await fetch(apiUrl)
-      console.log("🔍 checkForDuplicate: API response status:", res.status, res.statusText)
       
       if (res.ok) {
         const data = await res.json()
-        console.log("🔍 checkForDuplicate: API response data:", data)
         
-        if (data.isDuplicate) {
-          console.log("✅ DUPLICATE DETECTED:", {
-            upc: trimmedUpc,
-            existingSku: data.existingSku || "Unknown SKU",
-            productTitle: data.productTitle || "Unknown"
-          })
-          setIsDuplicate(true)
-          setDuplicateSku(data.existingSku || "")
-          console.log("✅ checkForDuplicate: State updated - isDuplicate: true, duplicateSku:", data.existingSku || "Unknown")
+        if (data.hasDuplicates && data.duplicates && data.duplicates.length > 0) {
+          // Show first duplicate SKU
+          setHasDuplicates(true)
+          setDuplicateSku(data.duplicates[0].sku || "")
+          setDuplicateUpc(data.upc || trimmedUpc)
+          console.log("✅ Duplicate detected:", data.duplicates[0])
         } else {
-          console.log("✅ checkForDuplicate: No duplicate found for UPC:", trimmedUpc)
-          // Explicitly clear if no duplicate found
-          setIsDuplicate(false)
+          setHasDuplicates(false)
           setDuplicateSku("")
-          console.log("✅ checkForDuplicate: State cleared - isDuplicate: false, duplicateSku: ''")
+          setDuplicateUpc("")
         }
       } else {
-        const errorData = await res.json().catch(() => ({}))
-        console.error("❌ checkForDuplicate: API returned error:", {
-          status: res.status,
-          statusText: res.statusText,
-          error: errorData
-        })
         // If API call failed, clear duplicate state
-        setIsDuplicate(false)
+        setHasDuplicates(false)
         setDuplicateSku("")
-        console.log("✅ checkForDuplicate: State cleared due to API error")
+        setDuplicateUpc("")
       }
     } catch (error) {
-      console.error("❌ checkForDuplicate: Exception occurred:", error)
-      console.error("❌ checkForDuplicate: Error details:", {
-        message: error instanceof Error ? error.message : "Unknown error",
-        stack: error instanceof Error ? error.stack : undefined
-      })
+      console.error("❌ Error checking for duplicates:", error)
       // On error, clear duplicate state (don't show false positives)
-      setIsDuplicate(false)
+      setHasDuplicates(false)
       setDuplicateSku("")
-      console.log("✅ checkForDuplicate: State cleared due to exception")
+      setDuplicateUpc("")
     }
-    
-    console.log("🔍 checkForDuplicate: Function completed")
   }
   
   // Fetch SKU preview for the next listing
@@ -1059,7 +1026,7 @@ export default function ProductSearchPage() {
           </div>
           
           {/* Duplicate Warning Banner */}
-          {isDuplicate && productData && (
+          {hasDuplicates && productData && duplicateSku && (
             <div className="mt-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-700 rounded-lg">
               <div className="flex items-start gap-3">
                 <svg className="w-6 h-6 shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -1068,10 +1035,10 @@ export default function ProductSearchPage() {
                 </svg>
                 <div className="flex-1">
                   <h3 className="text-lg font-bold text-red-700 dark:text-red-400 mb-2">
-                    {duplicateSku && duplicateSku.trim() !== "" ? `DUPLICATE SKU: ${duplicateSku}` : "DUPLICATE DETECTED"}
+                    DUPLICATE SKU: {duplicateSku}
                   </h3>
                   <p className="text-sm text-red-600 dark:text-red-300 mb-1">
-                    An item with the same UPC <span className="font-mono font-semibold">{upc}</span> already exists in your eBay inventory.
+                    An item with the same UPC <span className="font-mono font-semibold">{duplicateUpc || upc}</span> already exists in your eBay inventory.
                   </p>
                   <p className="text-sm text-red-600 dark:text-red-300">
                     This may indicate you already have this item listed. Please review carefully before proceeding.
