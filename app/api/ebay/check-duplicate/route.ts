@@ -90,21 +90,27 @@ export async function GET(req: Request) {
       ? "https://api.sandbox.ebay.com"
       : "https://api.ebay.com"
 
-    // Normalize UPC for comparison (remove non-digits, handle leading zeros)
+    // Normalize UPC for comparison - preserve leading zeros for accurate matching
     const normalizeUPC = (upcValue: string): string => {
       if (!upcValue) return ""
-      // Remove all non-digit characters
+      // Remove all non-digit characters but preserve leading zeros
       const digitsOnly = String(upcValue).replace(/\D/g, "")
-      if (digitsOnly.length === 0) return ""
-      // Remove leading zeros but keep at least one digit
-      const normalized = digitsOnly.replace(/^0+/, "") || digitsOnly
-      return normalized
+      return digitsOnly
     }
     
-    const normalizedSearchUPC = normalizeUPC(upc)
-    const originalUpcTrimmed = upc.trim()
+    // Also create a version without leading zeros for flexible matching
+    const normalizeUPCNoLeadingZeros = (upcValue: string): string => {
+      const normalized = normalizeUPC(upcValue)
+      if (!normalized) return ""
+      // Remove leading zeros but keep at least one digit
+      return normalized.replace(/^0+/, "") || normalized
+    }
     
-    console.log(`🔍 Checking for duplicate UPC. Original: "${upc}", Normalized: "${normalizedSearchUPC}"`)
+    const originalUpcTrimmed = upc.trim()
+    const normalizedSearchUPC = normalizeUPC(originalUpcTrimmed)
+    const normalizedSearchUPCNoZeros = normalizeUPCNoLeadingZeros(originalUpcTrimmed)
+    
+    console.log(`🔍 Checking for duplicate UPC. Original: "${upc}", Normalized (with zeros): "${normalizedSearchUPC}", Normalized (no zeros): "${normalizedSearchUPCNoZeros}"`)
 
     // Get all inventory items from the user's eBay account
     const inventoryUrl = `${baseUrl}/sell/inventory/v1/inventory_item`
@@ -120,11 +126,14 @@ export async function GET(req: Request) {
     if (!inventoryResponse.ok) {
       const errorText = await inventoryResponse.text().catch(() => "Unknown error")
       console.error("❌ Failed to fetch inventory items:", inventoryResponse.status, errorText)
+      console.error("❌ Full error response:", errorText)
       // If we can't check, return no duplicates (don't block the user)
       return NextResponse.json({
         hasDuplicates: false,
         duplicates: [],
-        upc: upc
+        upc: upc,
+        error: `Failed to fetch inventory: ${inventoryResponse.status}`,
+        debug: errorText
       })
     }
 
@@ -136,6 +145,9 @@ export async function GET(req: Request) {
     console.log(`📦 Total inventory items: ${inventoryData.total || 'unknown'}`)
     if (inventoryItems.length > 0) {
       console.log(`📦 First item SKU: ${inventoryItems[0].sku}`)
+      console.log(`📦 Sample item structure:`, JSON.stringify(inventoryItems[0], null, 2).substring(0, 500))
+    } else {
+      console.log(`⚠️ No inventory items found - user may not have any listings yet`)
     }
 
     // Helper function to check if item has matching UPC
@@ -164,9 +176,13 @@ export async function GET(req: Request) {
             ean: product?.ean,
             isbn: product?.isbn,
             gtin: product?.gtin,
-            productIdentifiers: product?.productIdentifiers
+            epid: product?.epid,
+            productIdentifiers: product?.productIdentifiers,
+            title: product?.title
           })
         } else {
+          const errorText = await itemResponse.text().catch(() => "")
+          console.warn(`⚠️ Failed to fetch details for SKU ${sku}: ${itemResponse.status} - ${errorText.substring(0, 200)}`)
           // Fall back to list data if available
           if (!product) {
             product = item.product
@@ -189,11 +205,14 @@ export async function GET(req: Request) {
       console.log(`🔍 Checking SKU ${sku} for UPC match:`, {
         searchingFor: originalUpcTrimmed,
         normalizedSearch: normalizedSearchUPC,
+        normalizedSearchNoZeros: normalizedSearchUPCNoZeros,
         productUpc: product.upc,
         productEan: product.ean,
         productIsbn: product.isbn,
         productGtin: product.gtin,
-        productIdentifiers: product.productIdentifiers
+        productEpid: product.epid,
+        productIdentifiers: product.productIdentifiers,
+        hasProductData: !!product
       })
       
       // Helper to check if a value matches our search UPC
@@ -210,13 +229,21 @@ export async function GET(req: Request) {
         
         const valueStr = String(value).trim()
         const normalizedValue = normalizeUPC(valueStr)
+        const normalizedValueNoZeros = normalizeUPCNoLeadingZeros(valueStr)
         
-        // Try multiple comparison methods
+        // Try multiple comparison methods for maximum compatibility
         const exactMatch = valueStr === originalUpcTrimmed
         const normalizedMatch = normalizedValue === normalizedSearchUPC
+        const normalizedMatchNoZeros = normalizedValueNoZeros === normalizedSearchUPCNoZeros
         const digitsOnlyMatch = valueStr.replace(/\D/g, "") === originalUpcTrimmed.replace(/\D/g, "")
         
-        return exactMatch || normalizedMatch || digitsOnlyMatch
+        const isMatch = exactMatch || normalizedMatch || normalizedMatchNoZeros || digitsOnlyMatch
+        
+        if (isMatch) {
+          console.log(`  ✅ MATCH: "${valueStr}" (normalized: "${normalizedValue}", no-zeros: "${normalizedValueNoZeros}") matches search "${originalUpcTrimmed}"`)
+        }
+        
+        return isMatch
       }
       
       // Check product.upc array
