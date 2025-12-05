@@ -63,9 +63,8 @@ export async function POST(req: Request) {
       description = description.trim()
     }
     
-    // Add seller note to description for all listings
-    const sellerNote = "\n\nPlease note: any mention of a digital copy or code may be expired and/or unavailable. This does not affect the quality or functionality of the DVD."
-    description = description + sellerNote
+    // Seller note text (will be used in conditionDescription field, not in description)
+    const sellerNote = "Please note: any mention of a digital copy or code may be expired and/or unavailable. This does not affect the quality or functionality of the DVD."
     
     // Price validation
     const priceNum = parseFloat(price)
@@ -479,11 +478,9 @@ export async function POST(req: Request) {
       }
     }
     
-    // Add condition description only for non-new items (eBay requirement)
-    const conditionDesc = getConditionDescription(condition)
-    if (conditionDesc) {
-      inventoryItemPayload.conditionDescription = conditionDesc
-    }
+    // Set seller note in conditionDescription field (this appears as "Seller Notes" on eBay)
+    // Note: eBay uses conditionDescription field to display "Seller Notes" in the listing
+    inventoryItemPayload.conditionDescription = sellerNote
     
     // Log the payload for debugging
     console.log("Creating inventory item with payload:", JSON.stringify(inventoryItemPayload, null, 2))
@@ -764,7 +761,7 @@ export async function POST(req: Request) {
       sku: finalSku,
       marketplaceId: "EBAY_US",
       format: "FIXED_PRICE",
-      listingDescription: description.substring(0, 50000), // eBay description limit
+      listingDescription: description.substring(0, 50000), // eBay description limit (seller note is in conditionDescription, not here)
       listingDuration: "GTC", // Good 'Til Cancelled - recommended for fixed price
       includeCatalogProductDetails: true, // Use eBay catalog data when available
       pricingSummary: {

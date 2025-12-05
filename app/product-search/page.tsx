@@ -1056,7 +1056,7 @@ export default function ProductSearchPage() {
 
           {/* Duplicate Warning Banner */}
           {hasDuplicates && productData && duplicateSku && (
-            <div className="mt-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-700 rounded-lg">
+            <div className="mt-4 mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-700 rounded-lg">
               <div className="flex-1">
                 <h3 className="text-base font-bold text-red-700 dark:text-red-400 mb-2">
                   Duplicate Notice
