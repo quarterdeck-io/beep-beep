@@ -154,11 +154,20 @@ export default function ProductSearchPage() {
         throw new Error(data.error || "Failed to search product")
       }
 
-      setProductData(data)
+      // Always default condition to "Used - Very Good" for new searches
+      const defaultCondition = "Used - Very Good"
+      
+      // Update productData condition to show "Used - Very Good" in preview
+      const productDataWithDefaultCondition = {
+        ...data,
+        condition: defaultCondition
+      }
+      
+      setProductData(productDataWithDefaultCondition)
       // Initialize editable fields with product data
       setEditedTitle(data.title || "")
       setEditedDescription(data.shortDescription || data.description || "")
-      setEditedCondition(data.condition || "Used - Very Good")
+      setEditedCondition(defaultCondition)
       setEditedPrice(data.price?.value || "0.00")
       setIsMeanPrice(data._searchMetadata?.isMeanPrice || false)
       setIsEditing(false)
@@ -200,11 +209,11 @@ export default function ProductSearchPage() {
   }
   
   const handleCancelEdit = () => {
-    // Reset to original values
+    // Reset to original values, but always default condition to "Used - Very Good"
     if (productData) {
       setEditedTitle(productData.title || "")
       setEditedDescription(productData.shortDescription || productData.description || "")
-      setEditedCondition(productData.condition || "Used - Very Good")
+      setEditedCondition("Used - Very Good")
       setEditedPrice(productData.price?.value || "0.00")
     }
     setIsEditing(false)
@@ -342,7 +351,7 @@ export default function ProductSearchPage() {
           title: editedTitle || productData.title || "",
           description: editedDescription || productData.shortDescription || productData.description || "",
           price: editedPrice || productData.price?.value || "0.00",
-          condition: editedCondition || productData.condition || "Used - Very Good",
+          condition: editedCondition || "Used - Very Good",
           
           // Images - primary and additional
           imageUrl: productData.image?.imageUrl || "",
@@ -1282,11 +1291,11 @@ export default function ProductSearchPage() {
                       ) : (
                         <div>
                           <p className="mt-1 text-gray-900 dark:text-white font-semibold">
-                            {productData.condition || "Not specified"}
+                            {productData.condition || editedCondition || "Used - Very Good"}
                           </p>
-                          {productData.condition && getConditionDescription(productData.condition) && (
+                          {(productData.condition || editedCondition || "Used - Very Good") && getConditionDescription(productData.condition || editedCondition || "Used - Very Good") && (
                             <p className="mt-2 text-sm text-gray-600 dark:text-gray-400 italic">
-                              {getConditionDescription(productData.condition)}
+                              {getConditionDescription(productData.condition || editedCondition || "Used - Very Good")}
                             </p>
                           )}
                         </div>
