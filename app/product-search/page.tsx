@@ -58,6 +58,10 @@ export default function ProductSearchPage() {
   const [skuPreview, setSkuPreview] = useState<string>("")
   const [loadingSku, setLoadingSku] = useState(false)
   
+  // Duplicate detection state
+  const [isDuplicate, setIsDuplicate] = useState(false)
+  const [duplicateSku, setDuplicateSku] = useState<string>("")
+  
   // Mean price tracking state
   const [isMeanPrice, setIsMeanPrice] = useState(false)
   
@@ -146,6 +150,8 @@ export default function ProductSearchPage() {
       setListingSuccess(null) // Clear success message for new search
       // Fetch SKU preview for this listing
       fetchSkuPreview()
+      // Check for duplicate in eBay inventory
+      checkForDuplicate(searchValue)
     } catch (err: any) {
       setError(err.message || "Failed to search product")
     } finally {
@@ -205,6 +211,28 @@ export default function ProductSearchPage() {
     setShowAspectForm(false)
     setError("")
     setSkuPreview("") // Clear SKU preview
+    setIsDuplicate(false) // Clear duplicate detection
+    setDuplicateSku("")
+  }
+  
+  // Check if product already exists in eBay inventory
+  const checkForDuplicate = async (upcCode: string) => {
+    setIsDuplicate(false)
+    setDuplicateSku("")
+    
+    try {
+      const res = await fetch(`/api/ebay/check-duplicate?upc=${encodeURIComponent(upcCode)}`)
+      if (res.ok) {
+        const data = await res.json()
+        if (data.isDuplicate) {
+          setIsDuplicate(true)
+          setDuplicateSku(data.existingSku || "")
+        }
+      }
+    } catch (error) {
+      console.error("Failed to check for duplicate:", error)
+      // Don't block the user if check fails
+    }
   }
   
   // Fetch SKU preview for the next listing
@@ -957,6 +985,29 @@ export default function ProductSearchPage() {
             )}
           </div>
           
+          {/* Duplicate Warning Banner */}
+          {isDuplicate && duplicateSku && productData && (
+            <div className="mt-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-700 rounded-lg">
+              <div className="flex items-start gap-3">
+                <svg className="w-6 h-6 shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 2L2 22h20L12 2z" fill="#FCD34D" stroke="#000000" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M12 8v4M12 16h.01" stroke="#000000" strokeWidth="2.5" strokeLinecap="round"/>
+                </svg>
+                <div className="flex-1">
+                  <h3 className="text-lg font-bold text-red-700 dark:text-red-400 mb-2">
+                    DUPLICATE SKU: {duplicateSku}
+                  </h3>
+                  <p className="text-sm text-red-600 dark:text-red-300 mb-1">
+                    An item with the same UPC <span className="font-mono font-semibold">{upc}</span> already exists in your eBay inventory.
+                  </p>
+                  <p className="text-sm text-red-600 dark:text-red-300">
+                    This may indicate you already have this item listed. Please review carefully before proceeding.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+          
           {/* Show product details */}
           {productData && (
             <>
@@ -1256,6 +1307,7 @@ export default function ProductSearchPage() {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                           </svg>
                           <div className="flex-1">
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Please fill in the following item specifics</h3>
                             <div className="space-y-4">
                               {missingAspects.map((aspect) => {
                                 const aspectDef = aspectDefinitions.find((a: any) => a.name === aspect)
