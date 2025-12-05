@@ -113,19 +113,84 @@ export async function GET(req: Request) {
       })
     }
 
+    // Normalize UPC for comparison (trim, remove leading zeros if needed)
+    const normalizeUPC = (upcValue: string): string => {
+      if (!upcValue) return ""
+      return upcValue.trim().replace(/^0+/, "") || upcValue.trim() // Remove leading zeros but keep if all zeros
+    }
+    
+    const normalizedSearchUPC = normalizeUPC(upc)
+    console.log(`Checking for duplicate UPC. Original: "${upc}", Normalized: "${normalizedSearchUPC}"`)
+
     const inventoryData = await inventoryResponse.json()
     let inventoryItems = inventoryData.inventoryItems || []
     let next = inventoryData.next
 
     console.log(`Found ${inventoryItems.length} inventory items on first page, checking for UPC match...`)
 
+    // Helper function to check if item has matching UPC
+    const hasMatchingUPC = (item: any): boolean => {
+      // Log item structure for debugging (only first item to avoid spam)
+      if (inventoryItems.indexOf(item) === 0) {
+        console.log("📦 Sample inventory item structure:", JSON.stringify({
+          sku: item.sku,
+          product: {
+            title: item.product?.title,
+            upc: item.product?.upc,
+            gtin: item.product?.gtin,
+            productIdentifiers: item.product?.productIdentifiers,
+            hasProduct: !!item.product
+          }
+        }, null, 2))
+      }
+      
+      // Check product.upc array
+      const productUPCs = item.product?.upc || []
+      if (Array.isArray(productUPCs) && productUPCs.length > 0) {
+        console.log(`🔍 Checking product.upc array for SKU ${item.sku}:`, productUPCs)
+        for (const itemUPC of productUPCs) {
+          const normalizedItemUPC = normalizeUPC(String(itemUPC))
+          if (normalizedItemUPC === normalizedSearchUPC || String(itemUPC).trim() === upc.trim()) {
+            console.log(`✅ UPC match found in product.upc: "${itemUPC}" (normalized: "${normalizedItemUPC}") matches "${upc}" (normalized: "${normalizedSearchUPC}")`)
+            return true
+          }
+        }
+      }
+      
+      // Check productIdentifiers array (alternative location)
+      const productIdentifiers = item.product?.productIdentifiers || []
+      if (Array.isArray(productIdentifiers)) {
+        for (const identifier of productIdentifiers) {
+          if (identifier.type === "UPC" || identifier.type === "UPC_A" || identifier.type === "UPC_E") {
+            const identifierValue = identifier.value || identifier.identifier
+            if (identifierValue) {
+              const normalizedIdentifierUPC = normalizeUPC(String(identifierValue))
+              if (normalizedIdentifierUPC === normalizedSearchUPC || String(identifierValue).trim() === upc.trim()) {
+                console.log(`UPC match found in productIdentifiers: "${identifierValue}" (normalized: "${normalizedIdentifierUPC}") matches "${upc}" (normalized: "${normalizedSearchUPC}")`)
+                return true
+              }
+            }
+          }
+        }
+      }
+      
+      // Check product.gtin (sometimes UPC is stored as GTIN)
+      const gtin = item.product?.gtin
+      if (gtin) {
+        const normalizedGTIN = normalizeUPC(String(gtin))
+        if (normalizedGTIN === normalizedSearchUPC || String(gtin).trim() === upc.trim()) {
+          console.log(`UPC match found in product.gtin: "${gtin}" (normalized: "${normalizedGTIN}") matches "${upc}" (normalized: "${normalizedSearchUPC}")`)
+          return true
+        }
+      }
+      
+      return false
+    }
+
     // Check first page
     for (const item of inventoryItems) {
-      const productUPCs = item.product?.upc || []
-      
-      // Check if this item has the same UPC
-      if (productUPCs.includes(upc)) {
-        console.log("DUPLICATE FOUND! SKU:", item.sku, "UPC:", upc)
+      if (hasMatchingUPC(item)) {
+        console.log("✅ DUPLICATE FOUND! SKU:", item.sku, "UPC:", upc, "Product:", item.product?.title || "Unknown")
         return NextResponse.json({
           isDuplicate: true,
           existingSku: item.sku,
@@ -157,10 +222,8 @@ export async function GET(req: Request) {
 
       // Check this page
       for (const item of inventoryItems) {
-        const productUPCs = item.product?.upc || []
-        
-        if (productUPCs.includes(upc)) {
-          console.log("DUPLICATE FOUND on subsequent page! SKU:", item.sku, "UPC:", upc)
+        if (hasMatchingUPC(item)) {
+          console.log("✅ DUPLICATE FOUND on subsequent page! SKU:", item.sku, "UPC:", upc, "Product:", item.product?.title || "Unknown")
           return NextResponse.json({
             isDuplicate: true,
             existingSku: item.sku,

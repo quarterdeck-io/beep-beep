@@ -83,6 +83,9 @@ export default function ProductSearchPage() {
     "Used - Good",
     "Used - Acceptable",
     "Brand New",
+    "Like New",
+    "Very Good",
+    "Good",
     "New Other",
     "New with Defects",
     "Manufacturer Refurbished",
@@ -94,6 +97,9 @@ export default function ProductSearchPage() {
   const getConditionDescription = (condition: string): string => {
     const descriptionMap: { [key: string]: string } = {
       "Brand New": "A brand-new, unused, unopened, undamaged item in its original packaging.",
+      "Like New": "An item that looks like it just came from the store. The item may have been opened or used only once or twice, with no visible signs of wear. All accessories and original packaging are included.",
+      "Very Good": "An item that has been used but remains in very good condition. The item shows minimal signs of wear and is fully functional with no defects. All major features work perfectly.",
+      "Good": "An item that has been used and shows normal signs of wear. The item is fully functional but may have minor cosmetic issues such as light scratches, scuffs, or marks. All features work as expected.",
       "New Other": "A new, unused item with absolutely no signs of wear. The item may be missing original packaging or protective wrapping, or may be in original packaging but not sealed.",
       "New with Defects": "A new, unused item with defects or irregularities. The item may have cosmetic imperfections, be a factory second, or be damaged in a way that does not affect its operation.",
       "Manufacturer Refurbished": "An item that has been restored to working order by the manufacturer. This means the item has been inspected, cleaned, and repaired to meet manufacturer specifications and is in excellent condition.",
@@ -133,15 +139,19 @@ export default function ProductSearchPage() {
   }, [])
 
   const performSearch = async (searchValue: string) => {
+    const trimmedUpc = searchValue.trim()
+    console.log("🔍 performSearch called with UPC:", trimmedUpc)
+    
     setError("")
     setProductData(null)
     setListingError(null) // Clear any previous listing errors
     setIsDuplicate(false) // Clear duplicate state for new search
     setDuplicateSku("") // Clear duplicate SKU for new search
+    setUpc(trimmedUpc) // Update UPC state for display
     setLoading(true)
 
     try {
-      const res = await fetch(`/api/ebay/search?upc=${encodeURIComponent(searchValue)}`)
+      const res = await fetch(`/api/ebay/search?upc=${encodeURIComponent(trimmedUpc)}`)
       const data = await res.json()
 
       if (!res.ok) {
@@ -163,9 +173,10 @@ export default function ProductSearchPage() {
       setListingSuccess(null) // Clear success message for new search
       // Fetch SKU preview for this listing
       fetchSkuPreview()
-      // Check for duplicate in eBay inventory (run in parallel, don't await)
-      checkForDuplicate(searchValue).catch((error) => {
-        console.error("Duplicate check failed:", error)
+      // Check for duplicate in eBay inventory using the searched UPC
+      console.log("🔍 performSearch: Calling checkForDuplicate with UPC:", trimmedUpc)
+      checkForDuplicate(trimmedUpc).catch((error) => {
+        console.error("❌ performSearch: Duplicate check failed:", error)
         // Don't block the user if check fails
       })
     } catch (err: any) {
