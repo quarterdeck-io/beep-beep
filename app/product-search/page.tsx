@@ -62,6 +62,7 @@ export default function ProductSearchPage() {
   const [hasDuplicates, setHasDuplicates] = useState(false)
   const [duplicateSku, setDuplicateSku] = useState<string>("")
   const [duplicateUpc, setDuplicateUpc] = useState<string>("")
+  const [checkingDuplicates, setCheckingDuplicates] = useState(false)
   
   
   // Mean price tracking state
@@ -131,7 +132,6 @@ export default function ProductSearchPage() {
 
   const performSearch = async (searchValue: string) => {
     const trimmedUpc = searchValue.trim()
-    console.log("🔍 performSearch called with UPC:", trimmedUpc)
     
     setError("")
     setProductData(null)
@@ -154,11 +154,20 @@ export default function ProductSearchPage() {
         throw new Error(data.error || "Failed to search product")
       }
 
-      setProductData(data)
+      // Always default condition to "Used - Very Good" for new searches
+      const defaultCondition = "Used - Very Good"
+      
+      // Update productData condition to show "Used - Very Good" in preview
+      const productDataWithDefaultCondition = {
+        ...data,
+        condition: defaultCondition
+      }
+      
+      setProductData(productDataWithDefaultCondition)
       // Initialize editable fields with product data
       setEditedTitle(data.title || "")
       setEditedDescription(data.shortDescription || data.description || "")
-      setEditedCondition(data.condition || "Used - Very Good")
+      setEditedCondition(defaultCondition)
       setEditedPrice(data.price?.value || "0.00")
       setIsMeanPrice(data._searchMetadata?.isMeanPrice || false)
       setIsEditing(false)
@@ -168,9 +177,7 @@ export default function ProductSearchPage() {
       fetchSkuPreview()
       
       // Check for duplicates in eBay inventory using the searched UPC
-      console.log("🔍 Checking for duplicates with UPC:", trimmedUpc)
-      checkForDuplicates(trimmedUpc).catch((error) => {
-        console.error("❌ Duplicate check failed:", error)
+      checkForDuplicates(trimmedUpc).catch(() => {
         // Don't block the user if check fails
       })
     } catch (err: any) {
@@ -202,11 +209,11 @@ export default function ProductSearchPage() {
   }
   
   const handleCancelEdit = () => {
-    // Reset to original values
+    // Reset to original values, but always default condition to "Used - Very Good"
     if (productData) {
       setEditedTitle(productData.title || "")
       setEditedDescription(productData.shortDescription || productData.description || "")
-      setEditedCondition(productData.condition || "Used - Very Good")
+      setEditedCondition("Used - Very Good")
       setEditedPrice(productData.price?.value || "0.00")
     }
     setIsEditing(false)
@@ -239,58 +246,47 @@ export default function ProductSearchPage() {
   
   // Check if products with this UPC already exist in eBay inventory
   const checkForDuplicates = async (upcCode: string) => {
-    console.log("🔍 checkForDuplicates called with UPC:", upcCode)
-    
     if (!upcCode || upcCode.trim() === "") {
-      console.warn("⚠️ Empty UPC code provided, skipping duplicate check")
       return
     }
     
     const trimmedUpc = upcCode.trim()
-    console.log("🔍 Starting duplicate check for UPC:", trimmedUpc)
+    setCheckingDuplicates(true)
+    setHasDuplicates(false)
+    setDuplicateSku("")
+    setDuplicateUpc("")
     
     try {
       const apiUrl = `/api/ebay/check-duplicate?upc=${encodeURIComponent(trimmedUpc)}`
-      console.log("🔍 Fetching from API:", apiUrl)
-      
       const res = await fetch(apiUrl)
-      console.log("🔍 API response status:", res.status, res.statusText)
       
       if (res.ok) {
         const data = await res.json()
-        console.log("🔍 API response data:", data)
         
         if (data.hasDuplicates && data.duplicates && data.duplicates.length > 0) {
           // Show first duplicate SKU
           setHasDuplicates(true)
           setDuplicateSku(data.duplicates[0].sku || "")
           setDuplicateUpc(data.upc || trimmedUpc)
-          console.log("✅ DUPLICATE FOUND! SKU:", data.duplicates[0].sku, "Title:", data.duplicates[0].title)
-          console.log("✅ Total duplicates found:", data.duplicates.length)
         } else {
           setHasDuplicates(false)
           setDuplicateSku("")
           setDuplicateUpc("")
-          console.log("✅ NO DUPLICATES FOUND for UPC:", trimmedUpc)
         }
       } else {
-        const errorData = await res.json().catch(() => ({}))
-        console.error("❌ API returned error:", res.status, errorData)
         // If API call failed, clear duplicate state
         setHasDuplicates(false)
         setDuplicateSku("")
         setDuplicateUpc("")
       }
     } catch (error) {
-      console.error("❌ Error checking for duplicates:", error)
-      console.error("❌ Error details:", error instanceof Error ? error.message : "Unknown error")
       // On error, clear duplicate state (don't show false positives)
       setHasDuplicates(false)
       setDuplicateSku("")
       setDuplicateUpc("")
+    } finally {
+      setCheckingDuplicates(false)
     }
-    
-    console.log("🔍 Duplicate check completed for UPC:", trimmedUpc)
   }
   
   // Fetch SKU preview for the next listing
@@ -355,7 +351,7 @@ export default function ProductSearchPage() {
           title: editedTitle || productData.title || "",
           description: editedDescription || productData.shortDescription || productData.description || "",
           price: editedPrice || productData.price?.value || "0.00",
-          condition: editedCondition || productData.condition || "Used - Very Good",
+          condition: editedCondition || "Used - Very Good",
           
           // Images - primary and additional
           imageUrl: productData.image?.imageUrl || "",
@@ -1043,34 +1039,39 @@ export default function ProductSearchPage() {
             )}
           </div>
           
+          {/* Duplicate Checking Notice */}
+          {checkingDuplicates && productData && (
+            <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-300 dark:border-blue-700 rounded-lg">
+              <div className="flex items-center gap-2">
+                <svg className="animate-spin h-4 w-4 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <p className="text-sm text-blue-700 dark:text-blue-300">
+                  Checking for duplicates from your connected eBay account...
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Duplicate Warning Banner */}
           {hasDuplicates && productData && duplicateSku && (
-            <div className="mt-6 p-6 bg-red-50 dark:bg-red-900/20 border-2 border-red-400 dark:border-red-600 rounded-lg shadow-lg">
-              <div className="flex items-start gap-4">
-                <div className="shrink-0">
-                  <svg className="w-8 h-8 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                  </svg>
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-xl font-bold text-red-700 dark:text-red-400 mb-3 flex items-center gap-2">
-                    <span>⚠️ Duplicate Notice</span>
-                  </h3>
-                  <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-red-200 dark:border-red-800 mb-3">
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
-                      Existing Listing SKU:
-                    </p>
-                    <p className="text-2xl font-bold text-red-700 dark:text-red-400 font-mono">
-                      {duplicateSku}
-                    </p>
-                  </div>
-                  <p className="text-sm text-red-600 dark:text-red-300 mb-2">
-                    <span className="font-semibold">UPC:</span> <span className="font-mono font-semibold">{duplicateUpc || upc}</span>
+            <div className="mt-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-700 rounded-lg">
+              <div className="flex-1">
+                <h3 className="text-base font-bold text-red-700 dark:text-red-400 mb-2">
+                  Duplicate Notice
+                </h3>
+                <div className="bg-white dark:bg-gray-800 p-3 rounded-lg border border-red-200 dark:border-red-800 mb-2">
+                  <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                    Existing Listing SKU:
                   </p>
-                  <p className="text-sm text-red-600 dark:text-red-300">
-                    A product with this UPC is already listed in your eBay inventory with the SKU shown above. Please review carefully before creating a duplicate listing.
+                  <p className="text-lg font-bold text-red-700 dark:text-red-400 font-mono">
+                    {duplicateSku}
                   </p>
                 </div>
+                <p className="text-xs text-red-600 dark:text-red-300">
+                  <span className="font-semibold">UPC:</span> <span className="font-mono font-semibold">{duplicateUpc || upc}</span> - This product is already listed in your eBay inventory.
+                </p>
               </div>
             </div>
           )}
@@ -1156,7 +1157,13 @@ export default function ProductSearchPage() {
                     <div className="flex justify-end gap-2 mb-4">
                       {!isEditing ? (
                         <button
-                          onClick={() => setIsEditing(true)}
+                          onClick={() => {
+                            // Ensure condition defaults to "Used - Very Good" if empty
+                            if (!editedCondition || editedCondition.trim() === "") {
+                              setEditedCondition("Used - Very Good")
+                            }
+                            setIsEditing(true)
+                          }}
                           className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors duration-200 flex items-center gap-2"
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1284,15 +1291,27 @@ export default function ProductSearchPage() {
                       ) : (
                         <div>
                           <p className="mt-1 text-gray-900 dark:text-white font-semibold">
-                            {productData.condition || "Not specified"}
+                            {productData.condition || editedCondition || "Used - Very Good"}
                           </p>
-                          {productData.condition && getConditionDescription(productData.condition) && (
+                          {(productData.condition || editedCondition || "Used - Very Good") && getConditionDescription(productData.condition || editedCondition || "Used - Very Good") && (
                             <p className="mt-2 text-sm text-gray-600 dark:text-gray-400 italic">
-                              {getConditionDescription(productData.condition)}
+                              {getConditionDescription(productData.condition || editedCondition || "Used - Very Good")}
                             </p>
                           )}
                         </div>
                       )}
+                    </div>
+
+                    {/* Seller Note */}
+                    <div>
+                      <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">
+                        Seller Note
+                      </h3>
+                      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-3">
+                        <p className="text-sm text-gray-700 dark:text-gray-300">
+                          Please note: any mention of a digital copy or code may be expired and/or unavailable. This does not affect the quality or functionality of the DVD.
+                        </p>
+                      </div>
                     </div>
 
                     {/* Action Buttons */}

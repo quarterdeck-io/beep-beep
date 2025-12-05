@@ -63,6 +63,10 @@ export async function POST(req: Request) {
       description = description.trim()
     }
     
+    // Add seller note to description for all listings
+    const sellerNote = "\n\nPlease note: any mention of a digital copy or code may be expired and/or unavailable. This does not affect the quality or functionality of the DVD."
+    description = description + sellerNote
+    
     // Price validation
     const priceNum = parseFloat(price)
     if (!price || isNaN(priceNum) || priceNum <= 0) {
