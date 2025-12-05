@@ -113,7 +113,10 @@ export async function GET(req: Request) {
     console.log(`🔍 Checking for duplicate UPC. Original: "${upc}", Normalized (with zeros): "${normalizedSearchUPC}", Normalized (no zeros): "${normalizedSearchUPCNoZeros}"`)
 
     // Get all inventory items from the user's eBay account
-    const inventoryUrl = `${baseUrl}/sell/inventory/v1/inventory_item`
+    // eBay API supports limit and offset query parameters for pagination
+    const inventoryUrl = `${baseUrl}/sell/inventory/v1/inventory_item?limit=25&offset=0`
+    
+    console.log(`📦 Fetching inventory items from: ${inventoryUrl}`)
     
     const inventoryResponse = await fetch(inventoryUrl, {
       headers: {
@@ -331,7 +334,19 @@ export async function GET(req: Request) {
 
     // If there are more pages, check them too
     while (next && duplicates.length < 10) { // Limit to first 10 duplicates
-      const nextResponse = await fetch(next, {
+      // Handle relative URLs from eBay API - prepend base URL if needed
+      let nextUrl = next
+      if (next.startsWith('/')) {
+        // Relative URL, prepend base URL
+        nextUrl = `${baseUrl}${next}`
+      } else if (!next.startsWith('http://') && !next.startsWith('https://')) {
+        // Not a full URL, prepend base URL
+        nextUrl = `${baseUrl}/${next}`
+      }
+      
+      console.log(`📦 Fetching next page: ${nextUrl}`)
+      
+      const nextResponse = await fetch(nextUrl, {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
