@@ -119,6 +119,8 @@ export async function GET(req: Request) {
       headers: {
         'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
+        'Content-Language': 'en-US',
+        'Accept-Language': 'en-US',
         'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
       },
     })
@@ -163,6 +165,8 @@ export async function GET(req: Request) {
           headers: {
             'Authorization': `Bearer ${accessToken}`,
             'Content-Type': 'application/json',
+            'Content-Language': 'en-US',
+            'Accept-Language': 'en-US',
             'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
           },
         })
@@ -331,6 +335,8 @@ export async function GET(req: Request) {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
+          'Content-Language': 'en-US',
+          'Accept-Language': 'en-US',
           'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
         },
       })
