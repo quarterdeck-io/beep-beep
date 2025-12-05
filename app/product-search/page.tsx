@@ -1302,6 +1302,18 @@ export default function ProductSearchPage() {
                       )}
                     </div>
 
+                    {/* Seller Note */}
+                    <div>
+                      <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">
+                        Seller Note
+                      </h3>
+                      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-3">
+                        <p className="text-sm text-gray-700 dark:text-gray-300">
+                          Please note: any mention of a digital copy or code may be expired and/or unavailable. This does not affect the quality or functionality of the DVD.
+                        </p>
+                      </div>
+                    </div>
+
                     {/* Action Buttons */}
                     <div className="flex flex-col sm:flex-row gap-3 mt-6">
                       {/* List on eBay Button */}
