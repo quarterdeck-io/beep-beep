@@ -62,6 +62,17 @@ export default function ProductSearchPage() {
   const [isDuplicate, setIsDuplicate] = useState(false)
   const [duplicateSku, setDuplicateSku] = useState<string>("")
   
+  // Log duplicate state changes
+  useEffect(() => {
+    console.log("📊 isDuplicate state changed:", {
+      isDuplicate,
+      duplicateSku,
+      productData: !!productData,
+      upc,
+      bannerShouldShow: isDuplicate && !!productData
+    })
+  }, [isDuplicate, duplicateSku, productData, upc])
+  
   // Mean price tracking state
   const [isMeanPrice, setIsMeanPrice] = useState(false)
   
@@ -222,35 +233,68 @@ export default function ProductSearchPage() {
   
   // Check if product already exists in eBay inventory
   const checkForDuplicate = async (upcCode: string) => {
+    console.log("🔍 checkForDuplicate called with UPC:", upcCode)
+    
     if (!upcCode || upcCode.trim() === "") {
+      console.warn("⚠️ checkForDuplicate: Empty UPC code provided, skipping check")
       return
     }
     
+    const trimmedUpc = upcCode.trim()
+    console.log("🔍 checkForDuplicate: Checking UPC:", trimmedUpc)
+    
     try {
-      const res = await fetch(`/api/ebay/check-duplicate?upc=${encodeURIComponent(upcCode.trim())}`)
+      const apiUrl = `/api/ebay/check-duplicate?upc=${encodeURIComponent(trimmedUpc)}`
+      console.log("🔍 checkForDuplicate: Fetching from API:", apiUrl)
+      
+      const res = await fetch(apiUrl)
+      console.log("🔍 checkForDuplicate: API response status:", res.status, res.statusText)
+      
       if (res.ok) {
         const data = await res.json()
+        console.log("🔍 checkForDuplicate: API response data:", data)
+        
         if (data.isDuplicate && data.existingSku) {
+          console.log("✅ DUPLICATE DETECTED:", {
+            upc: trimmedUpc,
+            existingSku: data.existingSku,
+            productTitle: data.productTitle || "Unknown"
+          })
           setIsDuplicate(true)
           setDuplicateSku(data.existingSku)
-          console.log("Duplicate detected:", { upc: upcCode, sku: data.existingSku })
+          console.log("✅ checkForDuplicate: State updated - isDuplicate: true, duplicateSku:", data.existingSku)
         } else {
+          console.log("✅ checkForDuplicate: No duplicate found for UPC:", trimmedUpc)
           // Explicitly clear if no duplicate found
           setIsDuplicate(false)
           setDuplicateSku("")
+          console.log("✅ checkForDuplicate: State cleared - isDuplicate: false, duplicateSku: ''")
         }
       } else {
+        const errorData = await res.json().catch(() => ({}))
+        console.error("❌ checkForDuplicate: API returned error:", {
+          status: res.status,
+          statusText: res.statusText,
+          error: errorData
+        })
         // If API call failed, clear duplicate state
         setIsDuplicate(false)
         setDuplicateSku("")
-        console.warn("Duplicate check API returned error:", res.status)
+        console.log("✅ checkForDuplicate: State cleared due to API error")
       }
     } catch (error) {
-      console.error("Failed to check for duplicate:", error)
+      console.error("❌ checkForDuplicate: Exception occurred:", error)
+      console.error("❌ checkForDuplicate: Error details:", {
+        message: error instanceof Error ? error.message : "Unknown error",
+        stack: error instanceof Error ? error.stack : undefined
+      })
       // On error, clear duplicate state (don't show false positives)
       setIsDuplicate(false)
       setDuplicateSku("")
+      console.log("✅ checkForDuplicate: State cleared due to exception")
     }
+    
+    console.log("🔍 checkForDuplicate: Function completed")
   }
   
   // Fetch SKU preview for the next listing
@@ -1004,7 +1048,18 @@ export default function ProductSearchPage() {
           </div>
           
           {/* Duplicate Warning Banner */}
-          {isDuplicate && productData && (
+          {(() => {
+            const shouldShow = isDuplicate && productData
+            if (shouldShow) {
+              console.log("🚨 DUPLICATE BANNER RENDERING:", {
+                isDuplicate,
+                duplicateSku,
+                hasProductData: !!productData,
+                upc
+              })
+            }
+            return shouldShow
+          })() && (
             <div className="mt-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-700 rounded-lg">
               <div className="flex items-start gap-3">
                 <svg className="w-6 h-6 shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
