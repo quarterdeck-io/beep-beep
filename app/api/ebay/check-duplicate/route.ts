@@ -141,87 +141,144 @@ export async function GET(req: Request) {
     const hasMatchingUPC = async (item: any): Promise<boolean> => {
       const sku = item.sku
       
-      // Log item structure for debugging (only first item to avoid spam)
-      if (inventoryItems.indexOf(item) === 0) {
-        console.log("📦 Sample inventory item from list:", JSON.stringify({
-          sku: item.sku,
-          product: {
-            title: item.product?.title,
-            upc: item.product?.upc,
-            gtin: item.product?.gtin,
-            productIdentifiers: item.product?.productIdentifiers,
-            hasProduct: !!item.product
-          }
-        }, null, 2))
-      }
-      
       // First, check if the list response has product data
       let product = item.product
+      let fetchedFullDetails = false
       
-      // If product data is missing or incomplete, fetch the full item details
-      if (!product || !product.upc) {
-        try {
-          console.log(`🔍 Fetching full details for SKU: ${sku}`)
-          const itemUrl = `${baseUrl}/sell/inventory/v1/inventory_item/${sku}`
-          const itemResponse = await fetch(itemUrl, {
-            headers: {
-              'Authorization': `Bearer ${accessToken}`,
-              'Content-Type': 'application/json',
-              'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
-            },
-          })
+      // Always fetch full item details to ensure we have complete product information
+      // The list endpoint often doesn't include full product data
+      try {
+        console.log(`🔍 Fetching full details for SKU: ${sku}`)
+        const itemUrl = `${baseUrl}/sell/inventory/v1/inventory_item/${sku}`
+        const itemResponse = await fetch(itemUrl, {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+            'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
+          },
+        })
+        
+        if (itemResponse.ok) {
+          const itemData = await itemResponse.json()
+          product = itemData.product
+          fetchedFullDetails = true
           
-          if (itemResponse.ok) {
-            const itemData = await itemResponse.json()
-            product = itemData.product
-            console.log(`📦 Full item details for SKU ${sku}:`, JSON.stringify({
+          // Log the full product structure for debugging
+          console.log(`📦 Full item details for SKU ${sku}:`, JSON.stringify({
+            sku: sku,
+            product: {
+              title: product?.title,
               upc: product?.upc,
+              ean: product?.ean,
+              isbn: product?.isbn,
               gtin: product?.gtin,
-              productIdentifiers: product?.productIdentifiers
-            }, null, 2))
-          } else {
-            console.warn(`⚠️ Failed to fetch full details for SKU ${sku}:`, itemResponse.status)
+              mpn: product?.mpn,
+              productIdentifiers: product?.productIdentifiers,
+              aspects: product?.aspects ? Object.keys(product.aspects) : null
+            }
+          }, null, 2))
+        } else {
+          const errorText = await itemResponse.text().catch(() => "")
+          console.warn(`⚠️ Failed to fetch full details for SKU ${sku}:`, itemResponse.status, errorText)
+          // Fall back to list data if available
+          if (!product) {
+            product = item.product
           }
-        } catch (fetchError) {
-          console.warn(`⚠️ Error fetching full details for SKU ${sku}:`, fetchError)
+        }
+      } catch (fetchError) {
+        console.warn(`⚠️ Error fetching full details for SKU ${sku}:`, fetchError)
+        // Fall back to list data if available
+        if (!product) {
+          product = item.product
         }
       }
       
       if (!product) {
+        console.log(`⚠️ No product data found for SKU ${sku}`)
         return false
       }
       
-      // Check product.upc array
-      const productUPCs = product.upc || []
-      if (Array.isArray(productUPCs) && productUPCs.length > 0) {
-        for (const itemUPC of productUPCs) {
-          const itemUPCStr = String(itemUPC).trim()
-          const normalizedItemUPC = normalizeUPC(itemUPCStr)
-          
-          // Try multiple comparison methods
-          if (normalizedItemUPC === normalizedSearchUPC || 
-              itemUPCStr === originalUpcTrimmed ||
-              normalizeUPC(originalUpcTrimmed) === normalizedItemUPC) {
-            console.log(`✅ UPC MATCH in product.upc for SKU ${sku}: "${itemUPCStr}" matches "${originalUpcTrimmed}"`)
-            return true
+      // Log what we're checking
+      console.log(`🔍 Checking UPC for SKU ${sku}:`, {
+        searchingFor: originalUpcTrimmed,
+        normalizedSearch: normalizedSearchUPC,
+        productUpc: product.upc,
+        productGtin: product.gtin,
+        productEan: product.ean,
+        productIsbn: product.isbn,
+        productIdentifiers: product.productIdentifiers
+      })
+      
+      // Helper to check if a value matches our search UPC
+      const checkValueMatch = (value: any, fieldName: string): boolean => {
+        if (!value) return false
+        
+        // Handle arrays
+        if (Array.isArray(value)) {
+          for (const val of value) {
+            if (checkValueMatch(val, fieldName)) return true
           }
+          return false
+        }
+        
+        const valueStr = String(value).trim()
+        const normalizedValue = normalizeUPC(valueStr)
+        
+        // Try multiple comparison methods
+        const matches = (
+          normalizedValue === normalizedSearchUPC ||
+          valueStr === originalUpcTrimmed ||
+          normalizeUPC(originalUpcTrimmed) === normalizedValue ||
+          // Also check if either normalized value contains the other (for partial matches)
+          (normalizedValue.length > 0 && normalizedSearchUPC.length > 0 && 
+           (normalizedValue.includes(normalizedSearchUPC) || normalizedSearchUPC.includes(normalizedValue)))
+        )
+        
+        if (matches) {
+          console.log(`✅ UPC MATCH in ${fieldName} for SKU ${sku}: "${valueStr}" (normalized: "${normalizedValue}") matches "${originalUpcTrimmed}" (normalized: "${normalizedSearchUPC}")`)
+        }
+        
+        return matches
+      }
+      
+      // Check product.upc array
+      if (product.upc) {
+        if (checkValueMatch(product.upc, "product.upc")) {
+          return true
+        }
+      }
+      
+      // Check product.ean (EAN can sometimes be the same as UPC)
+      if (product.ean) {
+        if (checkValueMatch(product.ean, "product.ean")) {
+          return true
+        }
+      }
+      
+      // Check product.isbn (ISBN-13 can sometimes match UPC)
+      if (product.isbn) {
+        if (checkValueMatch(product.isbn, "product.isbn")) {
+          return true
+        }
+      }
+      
+      // Check product.gtin (sometimes UPC is stored as GTIN)
+      if (product.gtin) {
+        if (checkValueMatch(product.gtin, "product.gtin")) {
+          return true
         }
       }
       
       // Check productIdentifiers array (alternative location)
       const productIdentifiers = product.productIdentifiers || []
-      if (Array.isArray(productIdentifiers)) {
+      if (Array.isArray(productIdentifiers) && productIdentifiers.length > 0) {
         for (const identifier of productIdentifiers) {
-          if (identifier.type === "UPC" || identifier.type === "UPC_A" || identifier.type === "UPC_E" || identifier.type === "GTIN") {
+          // Check all identifier types that might contain UPC
+          if (identifier.type === "UPC" || identifier.type === "UPC_A" || identifier.type === "UPC_E" || 
+              identifier.type === "GTIN" || identifier.type === "EAN" || identifier.type === "ISBN") {
             const identifierValue = identifier.value || identifier.identifier
             if (identifierValue) {
-              const identifierStr = String(identifierValue).trim()
-              const normalizedIdentifierUPC = normalizeUPC(identifierStr)
-              
-              if (normalizedIdentifierUPC === normalizedSearchUPC || 
-                  identifierStr === originalUpcTrimmed ||
-                  normalizeUPC(originalUpcTrimmed) === normalizedIdentifierUPC) {
-                console.log(`✅ UPC MATCH in productIdentifiers for SKU ${sku}: "${identifierStr}" matches "${originalUpcTrimmed}"`)
+              if (checkValueMatch(identifierValue, `productIdentifiers[${identifier.type}]`)) {
                 return true
               }
             }
@@ -229,20 +286,18 @@ export async function GET(req: Request) {
         }
       }
       
-      // Check product.gtin (sometimes UPC is stored as GTIN)
-      const gtin = product.gtin
-      if (gtin) {
-        const gtinStr = String(gtin).trim()
-        const normalizedGTIN = normalizeUPC(gtinStr)
-        
-        if (normalizedGTIN === normalizedSearchUPC || 
-            gtinStr === originalUpcTrimmed ||
-            normalizeUPC(originalUpcTrimmed) === normalizedGTIN) {
-          console.log(`✅ UPC MATCH in product.gtin for SKU ${sku}: "${gtinStr}" matches "${originalUpcTrimmed}"`)
-          return true
+      // Check aspects - sometimes UPC might be in item specifics
+      if (product.aspects && typeof product.aspects === 'object') {
+        for (const [key, value] of Object.entries(product.aspects)) {
+          if (key.toLowerCase().includes('upc') || key.toLowerCase().includes('barcode') || key.toLowerCase().includes('gtin')) {
+            if (checkValueMatch(value, `aspects[${key}]`)) {
+              return true
+            }
+          }
         }
       }
       
+      console.log(`❌ No UPC match found for SKU ${sku}`)
       return false
     }
 
