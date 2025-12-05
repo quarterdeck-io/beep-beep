@@ -1148,7 +1148,13 @@ export default function ProductSearchPage() {
                     <div className="flex justify-end gap-2 mb-4">
                       {!isEditing ? (
                         <button
-                          onClick={() => setIsEditing(true)}
+                          onClick={() => {
+                            // Ensure condition defaults to "Used - Very Good" if empty
+                            if (!editedCondition || editedCondition.trim() === "") {
+                              setEditedCondition("Used - Very Good")
+                            }
+                            setIsEditing(true)
+                          }}
                           className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors duration-200 flex items-center gap-2"
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
