@@ -163,9 +163,12 @@ export default function ProductSearchPage() {
       setIsMeanPrice(data._searchMetadata?.isMeanPrice || false)
       setIsEditing(false)
       setListingSuccess(null) // Clear success message for new search
+      
       // Fetch SKU preview for this listing
       fetchSkuPreview()
+      
       // Check for duplicates in eBay inventory using the searched UPC
+      console.log("🔍 Checking for duplicates with UPC:", trimmedUpc)
       checkForDuplicates(trimmedUpc).catch((error) => {
         console.error("❌ Duplicate check failed:", error)
         // Don't block the user if check fails
@@ -236,31 +239,43 @@ export default function ProductSearchPage() {
   
   // Check if products with this UPC already exist in eBay inventory
   const checkForDuplicates = async (upcCode: string) => {
+    console.log("🔍 checkForDuplicates called with UPC:", upcCode)
+    
     if (!upcCode || upcCode.trim() === "") {
+      console.warn("⚠️ Empty UPC code provided, skipping duplicate check")
       return
     }
     
     const trimmedUpc = upcCode.trim()
+    console.log("🔍 Starting duplicate check for UPC:", trimmedUpc)
     
     try {
       const apiUrl = `/api/ebay/check-duplicate?upc=${encodeURIComponent(trimmedUpc)}`
+      console.log("🔍 Fetching from API:", apiUrl)
+      
       const res = await fetch(apiUrl)
+      console.log("🔍 API response status:", res.status, res.statusText)
       
       if (res.ok) {
         const data = await res.json()
+        console.log("🔍 API response data:", data)
         
         if (data.hasDuplicates && data.duplicates && data.duplicates.length > 0) {
           // Show first duplicate SKU
           setHasDuplicates(true)
           setDuplicateSku(data.duplicates[0].sku || "")
           setDuplicateUpc(data.upc || trimmedUpc)
-          console.log("✅ Duplicate detected:", data.duplicates[0])
+          console.log("✅ DUPLICATE FOUND! SKU:", data.duplicates[0].sku, "Title:", data.duplicates[0].title)
+          console.log("✅ Total duplicates found:", data.duplicates.length)
         } else {
           setHasDuplicates(false)
           setDuplicateSku("")
           setDuplicateUpc("")
+          console.log("✅ NO DUPLICATES FOUND for UPC:", trimmedUpc)
         }
       } else {
+        const errorData = await res.json().catch(() => ({}))
+        console.error("❌ API returned error:", res.status, errorData)
         // If API call failed, clear duplicate state
         setHasDuplicates(false)
         setDuplicateSku("")
@@ -268,11 +283,14 @@ export default function ProductSearchPage() {
       }
     } catch (error) {
       console.error("❌ Error checking for duplicates:", error)
+      console.error("❌ Error details:", error instanceof Error ? error.message : "Unknown error")
       // On error, clear duplicate state (don't show false positives)
       setHasDuplicates(false)
       setDuplicateSku("")
       setDuplicateUpc("")
     }
+    
+    console.log("🔍 Duplicate check completed for UPC:", trimmedUpc)
   }
   
   // Fetch SKU preview for the next listing
