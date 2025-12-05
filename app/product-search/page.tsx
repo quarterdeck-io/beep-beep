@@ -58,11 +58,6 @@ export default function ProductSearchPage() {
   const [skuPreview, setSkuPreview] = useState<string>("")
   const [loadingSku, setLoadingSku] = useState(false)
   
-  // Duplicate detection state
-  const [isDuplicate, setIsDuplicate] = useState(false)
-  const [duplicateSku, setDuplicateSku] = useState<string>("")
-  const [checkingDuplicate, setCheckingDuplicate] = useState(false)
-  
   // Mean price tracking state
   const [isMeanPrice, setIsMeanPrice] = useState(false)
   
@@ -151,8 +146,6 @@ export default function ProductSearchPage() {
       setListingSuccess(null) // Clear success message for new search
       // Fetch SKU preview for this listing
       fetchSkuPreview()
-      // Check for duplicate in eBay inventory
-      checkForDuplicate(searchValue)
     } catch (err: any) {
       setError(err.message || "Failed to search product")
     } finally {
@@ -212,8 +205,6 @@ export default function ProductSearchPage() {
     setShowAspectForm(false)
     setError("")
     setSkuPreview("") // Clear SKU preview
-    setIsDuplicate(false) // Clear duplicate detection
-    setDuplicateSku("")
   }
   
   // Fetch SKU preview for the next listing
@@ -243,30 +234,6 @@ export default function ProductSearchPage() {
       console.error("Failed to fetch SKU preview:", error)
     } finally {
       setLoadingSku(false)
-    }
-  }
-  
-  // Check if product already exists in eBay inventory
-  const checkForDuplicate = async (upcCode: string) => {
-    setCheckingDuplicate(true)
-    setIsDuplicate(false)
-    setDuplicateSku("")
-    
-    try {
-      const res = await fetch(`/api/ebay/check-duplicate?upc=${encodeURIComponent(upcCode)}`)
-      if (res.ok) {
-        const data = await res.json()
-        if (data.isDuplicate) {
-          setIsDuplicate(true)
-          setDuplicateSku(data.existingSku || "")
-          console.log("Duplicate detected! Existing SKU:", data.existingSku)
-        }
-      }
-    } catch (error) {
-      console.error("Failed to check for duplicate:", error)
-      // Don't block the user if check fails
-    } finally {
-      setCheckingDuplicate(false)
     }
   }
   
@@ -766,8 +733,7 @@ export default function ProductSearchPage() {
       // 4. Not currently listing (to avoid duplicate listings)
       // 5. Scanner is not active
       // 6. No aspect form is showing
-      // 7. Not a duplicate product (duplicates not allowed)
-      // 8. Target is not an input, textarea, or button (to avoid conflicts)
+      // 7. Target is not an input, textarea, or button (to avoid conflicts)
       if (
         e.key === " " && 
         productData && 
@@ -775,7 +741,6 @@ export default function ProductSearchPage() {
         !listingLoading && 
         !scannerActive && 
         !showAspectForm &&
-        !isDuplicate &&
         !(e.target instanceof HTMLInputElement) &&
         !(e.target instanceof HTMLTextAreaElement) &&
         !(e.target instanceof HTMLButtonElement) &&
@@ -788,7 +753,7 @@ export default function ProductSearchPage() {
     
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [productData, scannerActive, showAspectForm, isEditing, listingLoading, isDuplicate])
+  }, [productData, scannerActive, showAspectForm, isEditing, listingLoading])
 
   if (checking) {
     return (
@@ -992,8 +957,8 @@ export default function ProductSearchPage() {
             )}
           </div>
           
-          {/* Show product details only if NOT a duplicate */}
-          {productData && !isDuplicate && (
+          {/* Show product details */}
+          {productData && (
             <>
               {/* Previously Listed SKU - Show when exists */}
               <div className="flex gap-3.5">
@@ -1217,9 +1182,8 @@ export default function ProductSearchPage() {
                       {/* List on eBay Button */}
                       <button
                         onClick={() => handleListOnEbay()}
-                        disabled={listingLoading || isEditing || isDuplicate}
+                        disabled={listingLoading || isEditing}
                         className="px-6 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
-                        title={isDuplicate ? "Cannot list duplicate product" : ""}
                       >
                         {listingLoading ? (
                           <>
@@ -1228,13 +1192,6 @@ export default function ProductSearchPage() {
                               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                             </svg>
                             Listing...
-                          </>
-                        ) : isDuplicate ? (
-                          <>
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-                            </svg>
-                            Duplicate - Cannot List
                           </>
                         ) : (
                           <>
@@ -1299,32 +1256,6 @@ export default function ProductSearchPage() {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                           </svg>
                           <div className="flex-1">
-                            {isDuplicate && duplicateSku ? (
-                              <>
-                                <h3 className="text-2xl font-bold text-red-700 dark:text-red-400 mb-2">
-                                  DUPLICATE SKU: {duplicateSku}
-                                </h3>
-                                <p className="text-sm text-red-600 dark:text-red-300 mb-2">
-                                  An item with the same UPC <span className="font-mono font-semibold">{upc}</span> already exists in your eBay inventory.
-                                </p>
-                                <p className="text-sm text-red-600 dark:text-red-300 mb-4">
-                                  This may indicate you already have this item listed. Please review carefully before proceeding.
-                                </p>
-                              </>
-                            ) : (
-                              <>
-                               <h3 className="text-2xl font-bold text-red-700 dark:text-red-400 mb-2">
-                                  DUPLICATE SKU: {duplicateSku}
-                                </h3>
-                                <p className="text-sm text-red-600 dark:text-red-300 mb-2">
-                                  An item with the same UPC <span className="font-mono font-semibold">{upc}</span> already exists in your eBay inventory.
-                                </p>
-                                <p className="text-sm text-red-600 dark:text-red-300 mb-4">
-                                  This may indicate you already have this item listed. Please review carefully before proceeding.
-                                </p>
-                              </>
-                            )}
-                            
                             <div className="space-y-4">
                               {missingAspects.map((aspect) => {
                                 const aspectDef = aspectDefinitions.find((a: any) => a.name === aspect)
