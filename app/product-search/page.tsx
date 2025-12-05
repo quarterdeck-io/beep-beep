@@ -265,15 +265,15 @@ export default function ProductSearchPage() {
         const data = await res.json()
         console.log("🔍 checkForDuplicate: API response data:", data)
         
-        if (data.isDuplicate && data.existingSku) {
+        if (data.isDuplicate) {
           console.log("✅ DUPLICATE DETECTED:", {
             upc: trimmedUpc,
-            existingSku: data.existingSku,
+            existingSku: data.existingSku || "Unknown SKU",
             productTitle: data.productTitle || "Unknown"
           })
           setIsDuplicate(true)
-          setDuplicateSku(data.existingSku)
-          console.log("✅ checkForDuplicate: State updated - isDuplicate: true, duplicateSku:", data.existingSku)
+          setDuplicateSku(data.existingSku || "")
+          console.log("✅ checkForDuplicate: State updated - isDuplicate: true, duplicateSku:", data.existingSku || "Unknown")
         } else {
           console.log("✅ checkForDuplicate: No duplicate found for UPC:", trimmedUpc)
           // Explicitly clear if no duplicate found
@@ -1059,18 +1059,7 @@ export default function ProductSearchPage() {
           </div>
           
           {/* Duplicate Warning Banner */}
-          {(() => {
-            const shouldShow = isDuplicate && productData
-            if (shouldShow) {
-              console.log("🚨 DUPLICATE BANNER RENDERING:", {
-                isDuplicate,
-                duplicateSku,
-                hasProductData: !!productData,
-                upc
-              })
-            }
-            return shouldShow
-          })() && (
+          {isDuplicate && productData && (
             <div className="mt-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-700 rounded-lg">
               <div className="flex items-start gap-3">
                 <svg className="w-6 h-6 shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -1079,7 +1068,7 @@ export default function ProductSearchPage() {
                 </svg>
                 <div className="flex-1">
                   <h3 className="text-lg font-bold text-red-700 dark:text-red-400 mb-2">
-                    {duplicateSku ? `DUPLICATE SKU: ${duplicateSku}` : "DUPLICATE DETECTED"}
+                    {duplicateSku && duplicateSku.trim() !== "" ? `DUPLICATE SKU: ${duplicateSku}` : "DUPLICATE DETECTED"}
                   </h3>
                   <p className="text-sm text-red-600 dark:text-red-300 mb-1">
                     An item with the same UPC <span className="font-mono font-semibold">{upc}</span> already exists in your eBay inventory.

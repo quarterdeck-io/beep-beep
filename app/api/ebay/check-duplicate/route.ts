@@ -163,20 +163,21 @@ export async function GET(req: Request) {
           product = itemData.product
           fetchedFullDetails = true
           
-          // Log the full product structure for debugging
-          console.log(`📦 Full item details for SKU ${sku}:`, JSON.stringify({
-            sku: sku,
-            product: {
-              title: product?.title,
-              upc: product?.upc,
-              ean: product?.ean,
-              isbn: product?.isbn,
-              gtin: product?.gtin,
-              mpn: product?.mpn,
-              productIdentifiers: product?.productIdentifiers,
-              aspects: product?.aspects ? Object.keys(product.aspects) : null
-            }
-          }, null, 2))
+          // Log the FULL raw product structure for debugging - this will show us exactly what eBay returns
+          console.log(`📦 FULL RAW PRODUCT DATA for SKU ${sku}:`, JSON.stringify(product, null, 2))
+          
+          // Also log a summary
+          console.log(`📦 Summary for SKU ${sku}:`, {
+            title: product?.title,
+            upc: product?.upc,
+            ean: product?.ean,
+            isbn: product?.isbn,
+            gtin: product?.gtin,
+            mpn: product?.mpn,
+            productIdentifiers: product?.productIdentifiers,
+            aspectsKeys: product?.aspects ? Object.keys(product.aspects) : null,
+            allKeys: product ? Object.keys(product) : []
+          })
         } else {
           const errorText = await itemResponse.text().catch(() => "")
           console.warn(`⚠️ Failed to fetch full details for SKU ${sku}:`, itemResponse.status, errorText)
@@ -224,18 +225,32 @@ export async function GET(req: Request) {
         const valueStr = String(value).trim()
         const normalizedValue = normalizeUPC(valueStr)
         
-        // Try multiple comparison methods
-        const matches = (
-          normalizedValue === normalizedSearchUPC ||
-          valueStr === originalUpcTrimmed ||
-          normalizeUPC(originalUpcTrimmed) === normalizedValue ||
-          // Also check if either normalized value contains the other (for partial matches)
-          (normalizedValue.length > 0 && normalizedSearchUPC.length > 0 && 
-           (normalizedValue.includes(normalizedSearchUPC) || normalizedSearchUPC.includes(normalizedValue)))
-        )
+        // Try multiple comparison methods - be more lenient
+        const exactMatch = valueStr === originalUpcTrimmed
+        const normalizedMatch = normalizedValue === normalizedSearchUPC
+        const reverseNormalizedMatch = normalizeUPC(originalUpcTrimmed) === normalizedValue
+        const digitsOnlyMatch = valueStr.replace(/\D/g, "") === originalUpcTrimmed.replace(/\D/g, "")
+        
+        const matches = exactMatch || normalizedMatch || reverseNormalizedMatch || digitsOnlyMatch
         
         if (matches) {
-          console.log(`✅ UPC MATCH in ${fieldName} for SKU ${sku}: "${valueStr}" (normalized: "${normalizedValue}") matches "${originalUpcTrimmed}" (normalized: "${normalizedSearchUPC}")`)
+          console.log(`✅ UPC MATCH in ${fieldName} for SKU ${sku}:`, {
+            found: valueStr,
+            foundNormalized: normalizedValue,
+            searching: originalUpcTrimmed,
+            searchingNormalized: normalizedSearchUPC,
+            matchType: exactMatch ? "exact" : normalizedMatch ? "normalized" : reverseNormalizedMatch ? "reverse-normalized" : "digits-only"
+          })
+        } else {
+          // Log non-matches for debugging (only for first few items to avoid spam)
+          if (inventoryItems.indexOf(item) < 3) {
+            console.log(`❌ No match in ${fieldName} for SKU ${sku}:`, {
+              found: valueStr,
+              foundNormalized: normalizedValue,
+              searching: originalUpcTrimmed,
+              searchingNormalized: normalizedSearchUPC
+            })
+          }
         }
         
         return matches
@@ -305,12 +320,14 @@ export async function GET(req: Request) {
     for (const item of inventoryItems) {
       const isMatch = await hasMatchingUPC(item)
       if (isMatch === true) {
-        console.log("✅ DUPLICATE FOUND! SKU:", item.sku, "UPC:", upc, "Product:", item.product?.title || "Unknown")
+        const foundSku = item.sku || "Unknown"
+        const foundTitle = item.product?.title || "Unknown product"
+        console.log("✅ DUPLICATE FOUND! SKU:", foundSku, "UPC:", upc, "Product:", foundTitle)
         return NextResponse.json({
           isDuplicate: true,
-          existingSku: item.sku,
+          existingSku: foundSku,
           upc: upc,
-          productTitle: item.product?.title || "Unknown product"
+          productTitle: foundTitle
         })
       }
     }
@@ -341,22 +358,26 @@ export async function GET(req: Request) {
       for (const item of inventoryItems) {
         const isMatch = await hasMatchingUPC(item)
         if (isMatch === true) {
-          console.log("✅ DUPLICATE FOUND on subsequent page! SKU:", item.sku, "UPC:", upc, "Product:", item.product?.title || "Unknown")
+          const foundSku = item.sku || "Unknown"
+          const foundTitle = item.product?.title || "Unknown product"
+          console.log("✅ DUPLICATE FOUND on subsequent page! SKU:", foundSku, "UPC:", upc, "Product:", foundTitle)
           return NextResponse.json({
             isDuplicate: true,
-            existingSku: item.sku,
+            existingSku: foundSku,
             upc: upc,
-            productTitle: item.product?.title || "Unknown product"
+            productTitle: foundTitle
           })
         }
       }
     }
 
-    console.log("No duplicate found for UPC:", upc)
+    console.log(`❌ No duplicate found for UPC: "${upc}" after checking all ${inventoryData.total || inventoryItems.length} inventory items`)
+    console.log(`📊 Summary: Checked ${inventoryItems.length} items on first page${next ? ' and subsequent pages' : ''}`)
     return NextResponse.json({
       isDuplicate: false,
       existingSku: null,
-      upc: upc
+      upc: upc,
+      itemsChecked: inventoryData.total || inventoryItems.length
     })
 
   } catch (error) {
