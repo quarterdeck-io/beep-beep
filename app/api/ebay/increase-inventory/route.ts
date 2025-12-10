@@ -246,19 +246,18 @@ export async function POST(req: Request) {
       }
     }
     
+    // CRITICAL: Only proceed if we found a PUBLISHED offer
+    // We should NOT update unpublished offers when there's already a published listing
     if (!offer) {
-      // If still no published offer, use the first one but warn
-      if (offers.length > 0) {
-        offer = offers[0]
-        console.warn(`[INVENTORY] ⚠️ No published offer found. Using offer with status: ${offer.status}`)
-      } else {
-        return NextResponse.json(
-          { error: "No offer found for this product. Please ensure the item is listed on eBay." },
-          { status: 404 }
-        )
-      }
+      return NextResponse.json(
+        { 
+          error: "No published listing found for this product. The item may not be currently listed on eBay, or there may be an unpublished draft. Please list the item first before increasing inventory.",
+          hint: "If you see a duplicate notice, the published listing exists but we couldn't find it. Try refreshing and checking your eBay listings."
+        },
+        { status: 404 }
+      )
     }
-
+    
     const offerId = offer.offerId
     const offerStatus = offer.status
     const listingId = offer.listingId || offer.listing?.listingId
@@ -272,9 +271,16 @@ export async function POST(req: Request) {
       )
     }
     
-    // If the selected offer is not published, warn the user
+    // Double-check: Only proceed if offer is PUBLISHED
     if (offerStatus !== "PUBLISHED") {
-      console.warn(`[INVENTORY] ⚠️ Selected offer is not published (status: ${offerStatus}). This may not update the live listing.`)
+      console.error(`[INVENTORY] ❌ Selected offer is not published (status: ${offerStatus}). Cannot update unpublished offers.`)
+      return NextResponse.json(
+        { 
+          error: `Cannot increase inventory for unpublished offer. The offer status is "${offerStatus}". Only published listings can have their inventory increased.`,
+          hint: "Please ensure the item is published on eBay before trying to increase inventory."
+        },
+        { status: 400 }
+      )
     }
 
     // Get the current offer details to preserve all fields
