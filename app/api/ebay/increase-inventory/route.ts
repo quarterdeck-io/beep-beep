@@ -90,9 +90,9 @@ export async function POST(req: Request) {
       ? "https://api.sandbox.ebay.com"
       : "https://api.ebay.com"
 
-    // First, get the existing offer to find the offer ID
-    // We need to search for offers by SKU
-    const offersUrl = `${baseUrl}/sell/inventory/v1/offer?sku=${encodeURIComponent(sku)}&limit=1`
+    // First, get all offers for this SKU to find the PUBLISHED one
+    // We need to search for offers by SKU and find the published/active one
+    const offersUrl = `${baseUrl}/sell/inventory/v1/offer?sku=${encodeURIComponent(sku)}&limit=25`
     
     const offersResponse = await fetch(offersUrl, {
       headers: {
@@ -115,25 +115,43 @@ export async function POST(req: Request) {
     const offersData = await offersResponse.json()
     const offers = offersData.offers || []
     
+    console.log(`[INVENTORY] Found ${offers.length} offer(s) for SKU: ${sku}`)
+    
     if (offers.length === 0) {
       return NextResponse.json(
-        { error: "No active offer found for this SKU" },
+        { error: "No offer found for this SKU" },
         { status: 404 }
       )
     }
 
-    const offer = offers[0]
+    // Find the PUBLISHED offer (the one that's actually listed on eBay)
+    // Priority: PUBLISHED with listing > PUBLISHED > any other status
+    let offer = offers.find((o: any) => o.status === "PUBLISHED" && o.listing?.listingId)
+    if (!offer) {
+      offer = offers.find((o: any) => o.status === "PUBLISHED")
+    }
+    if (!offer) {
+      // If no published offer, use the first one but warn
+      offer = offers[0]
+      console.warn(`[INVENTORY] ⚠️ No published offer found. Using offer with status: ${offer.status}`)
+    }
+
     const offerId = offer.offerId
     const offerStatus = offer.status
-    const listingId = offer.listingId
+    const listingId = offer.listingId || offer.listing?.listingId
     
-    console.log(`[INVENTORY] Found offer - ID: ${offerId}, Status: ${offerStatus}, Listing ID: ${listingId}`)
+    console.log(`[INVENTORY] Selected offer - ID: ${offerId}, Status: ${offerStatus}, Listing ID: ${listingId}`)
     
     if (!offerId) {
       return NextResponse.json(
         { error: "Offer ID not found" },
         { status: 404 }
       )
+    }
+    
+    // If the selected offer is not published, warn the user
+    if (offerStatus !== "PUBLISHED") {
+      console.warn(`[INVENTORY] ⚠️ Selected offer is not published (status: ${offerStatus}). This may not update the live listing.`)
     }
 
     // Get the current offer details to preserve all fields
