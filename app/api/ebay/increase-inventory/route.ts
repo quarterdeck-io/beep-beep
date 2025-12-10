@@ -217,7 +217,7 @@ export async function POST(req: Request) {
           }
         }
         
-        console.log(`[INVENTORY] Found ${matchingSkus.length} inventory item(s) matching UPC`)
+        console.log(`[INVENTORY] Found ${matchingSkus.length} inventory item(s) matching UPC: ${matchingSkus.join(", ")}`)
         
         // Get offers for all matching SKUs
         for (const itemSku of matchingSkus) {
@@ -234,14 +234,25 @@ export async function POST(req: Request) {
           
           if (itemOffersResponse.ok) {
             const itemOffersData = await itemOffersResponse.json()
-            offers.push(...(itemOffersData.offers || []))
+            const itemOffers = itemOffersData.offers || []
+            console.log(`[INVENTORY] Found ${itemOffers.length} offer(s) for SKU ${itemSku}:`, itemOffers.map((o: any) => ({ id: o.offerId, status: o.status, listingId: o.listingId || o.listing?.listingId })))
+            offers.push(...itemOffers)
           }
         }
+        
+        console.log(`[INVENTORY] Total offers found by UPC: ${offers.length}`)
+        console.log(`[INVENTORY] Offer statuses:`, offers.map((o: any) => ({ id: o.offerId, status: o.status, listingId: o.listingId || o.listing?.listingId })))
         
         // Now find published offer from all offers
         offer = offers.find((o: any) => o.status === "PUBLISHED" && o.listing?.listingId)
         if (!offer) {
           offer = offers.find((o: any) => o.status === "PUBLISHED")
+        }
+        
+        if (offer) {
+          console.log(`[INVENTORY] ✅ Found published offer by UPC search:`, { id: offer.offerId, status: offer.status, listingId: offer.listingId || offer.listing?.listingId })
+        } else {
+          console.warn(`[INVENTORY] ⚠️ No published offer found in ${offers.length} offers found by UPC`)
         }
       }
     }
