@@ -125,8 +125,9 @@ export async function POST(req: Request) {
     const offer = offers[0]
     const offerId = offer.offerId
     const offerStatus = offer.status
+    const listingId = offer.listingId
     
-    console.log(`[INVENTORY] Found offer - ID: ${offerId}, Status: ${offerStatus}`)
+    console.log(`[INVENTORY] Found offer - ID: ${offerId}, Status: ${offerStatus}, Listing ID: ${listingId}`)
     
     if (!offerId) {
       return NextResponse.json(
@@ -162,7 +163,11 @@ export async function POST(req: Request) {
     const newQuantity = currentQuantity + 1
 
     console.log(`[INVENTORY] Current quantity: ${currentQuantity}, New quantity: ${newQuantity}`)
+    console.log(`[INVENTORY] Offer status: ${offerStatus}, Listing ID: ${listingId}`)
     console.log(`[INVENTORY] Current offer structure:`, JSON.stringify(currentOffer, null, 2))
+    
+    // For published offers, we might also need to update the inventory item
+    // But first, let's try updating the offer and see if that works
 
     // Build update payload with only the fields that can be updated
     // eBay requires specific fields for offer updates - must match the structure from GET
@@ -256,8 +261,15 @@ export async function POST(req: Request) {
       console.warn(`[INVENTORY] ⚠️ Could not verify update (status: ${verifyResponse.status})`)
     }
 
-    // Publish the updated offer
+    // For published offers, we need to republish to sync the changes
+    // eBay requires republishing even if the offer is already published
+    if (offerStatus === "PUBLISHED" || listingId) {
+      console.log(`[INVENTORY] Offer is already published. Will republish to sync quantity changes.`)
+    }
+
+    // Publish the updated offer if it's not already published
     const publishUrl = `${baseUrl}/sell/inventory/v1/offer/${offerId}/publish`
+    console.log(`[INVENTORY] Publishing offer (status was: ${offerStatus})`)
     const publishResponse = await fetch(publishUrl, {
       method: "POST",
       headers: {
@@ -292,7 +304,7 @@ export async function POST(req: Request) {
       success: true,
       newQuantity: newQuantity,
       message: "Inventory increased and published successfully",
-      listingId: publishResult.listingId || null
+      listingId: publishResult.listingId || listingId || null
     })
 
   } catch (error) {
