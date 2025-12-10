@@ -261,13 +261,24 @@ export async function POST(req: Request) {
       console.warn(`[INVENTORY] ⚠️ Could not verify update (status: ${verifyResponse.status})`)
     }
 
-    // For published offers, we need to republish to sync the changes
-    // eBay requires republishing even if the offer is already published
-    if (offerStatus === "PUBLISHED" || listingId) {
-      console.log(`[INVENTORY] Offer is already published. Will republish to sync quantity changes.`)
+    // For published offers, eBay automatically syncs changes to the live listing
+    // We should NOT republish - eBay warns against it (error 25402)
+    // Changes should appear on the live listing within 1-2 minutes
+    const activeListingId = listingId || currentOffer.listing?.listingId
+    if (offerStatus === "PUBLISHED" || activeListingId || currentOffer.listing?.listingStatus === "ACTIVE") {
+      console.log(`[INVENTORY] Offer is already published (Listing ID: ${activeListingId}). Changes will sync automatically.`)
+      console.log(`[INVENTORY] ⏳ Note: It may take 1-2 minutes for changes to appear on eBay listing.`)
+      
+      return NextResponse.json({
+        success: true,
+        newQuantity: newQuantity,
+        message: `Inventory increased successfully! Quantity updated from ${currentQuantity} to ${newQuantity}. Changes will appear on your eBay listing within 1-2 minutes.`,
+        listingId: activeListingId || null,
+        note: "Offer is already published - changes sync automatically to live listing"
+      })
     }
 
-    // Publish the updated offer if it's not already published
+    // Only publish if the offer is not already published
     const publishUrl = `${baseUrl}/sell/inventory/v1/offer/${offerId}/publish`
     console.log(`[INVENTORY] Publishing offer (status was: ${offerStatus})`)
     const publishResponse = await fetch(publishUrl, {
@@ -304,7 +315,7 @@ export async function POST(req: Request) {
       success: true,
       newQuantity: newQuantity,
       message: "Inventory increased and published successfully",
-      listingId: publishResult.listingId || listingId || null
+      listingId: publishResult.listingId || null
     })
 
   } catch (error) {
