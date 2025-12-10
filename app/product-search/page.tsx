@@ -63,6 +63,8 @@ export default function ProductSearchPage() {
   const [duplicateSku, setDuplicateSku] = useState<string>("")
   const [duplicateUpc, setDuplicateUpc] = useState<string>("")
   const [checkingDuplicates, setCheckingDuplicates] = useState(false)
+  const [increasingInventory, setIncreasingInventory] = useState(false)
+  const [inventoryMessage, setInventoryMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
   
   
   // Mean price tracking state
@@ -242,6 +244,7 @@ export default function ProductSearchPage() {
     setHasDuplicates(false) // Clear duplicate detection
     setDuplicateSku("")
     setDuplicateUpc("")
+    setInventoryMessage(null) // Clear inventory increase message
   }
   
   // Check if products with this UPC already exist in eBay inventory
@@ -266,12 +269,19 @@ export default function ProductSearchPage() {
         if (data.hasDuplicates && data.duplicates && data.duplicates.length > 0) {
           // Show first duplicate SKU
           setHasDuplicates(true)
-          setDuplicateSku(data.duplicates[0].sku || "")
+          const duplicateSkuValue = data.duplicates[0].sku || ""
+          setDuplicateSku(duplicateSkuValue)
           setDuplicateUpc(data.upc || trimmedUpc)
+          // Update SKU preview to show duplicate SKU instead of next SKU
+          if (duplicateSkuValue) {
+            setSkuPreview(duplicateSkuValue)
+          }
         } else {
           setHasDuplicates(false)
           setDuplicateSku("")
           setDuplicateUpc("")
+          // Reset to normal SKU preview if no duplicates
+          fetchSkuPreview(false)
         }
       } else {
         // If API call failed, clear duplicate state
@@ -286,6 +296,48 @@ export default function ProductSearchPage() {
       setDuplicateUpc("")
     } finally {
       setCheckingDuplicates(false)
+    }
+  }
+  
+  // Handle increasing inventory for existing listing
+  const handleIncreaseInventory = async () => {
+    if (!duplicateSku) {
+      setInventoryMessage({ type: "error", text: "No SKU found to increase inventory" })
+      return
+    }
+    
+    setIncreasingInventory(true)
+    setInventoryMessage(null)
+    
+    try {
+      const res = await fetch("/api/ebay/increase-inventory", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ sku: duplicateSku }),
+      })
+      
+      const data = await res.json()
+      
+      if (res.ok) {
+        setInventoryMessage({ 
+          type: "success", 
+          text: `✓ Inventory increased successfully! New quantity: ${data.newQuantity}` 
+        })
+      } else {
+        setInventoryMessage({ 
+          type: "error", 
+          text: data.error || "Failed to increase inventory" 
+        })
+      }
+    } catch (error: any) {
+      setInventoryMessage({ 
+        type: "error", 
+        text: error.message || "Failed to increase inventory" 
+      })
+    } finally {
+      setIncreasingInventory(false)
     }
   }
   
@@ -1069,9 +1121,35 @@ export default function ProductSearchPage() {
                     {duplicateSku}
                   </p>
                 </div>
-                <p className="text-xs text-red-600 dark:text-red-300">
+                <p className="text-xs text-red-600 dark:text-red-300 mb-3">
                   <span className="font-semibold">UPC:</span> <span className="font-mono font-semibold">{duplicateUpc || upc}</span> - This product is already listed in your eBay inventory.
                 </p>
+                {inventoryMessage && (
+                  <div className={`mb-3 p-2 rounded text-xs ${
+                    inventoryMessage.type === "success"
+                      ? "bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300"
+                      : "bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300"
+                  }`}>
+                    {inventoryMessage.text}
+                  </div>
+                )}
+                <button
+                  onClick={handleIncreaseInventory}
+                  disabled={increasingInventory}
+                  className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {increasingInventory ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Increasing...
+                    </>
+                  ) : (
+                    "Increase existing product inventory by 1"
+                  )}
+                </button>
               </div>
             </div>
           )}
