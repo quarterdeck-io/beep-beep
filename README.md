@@ -1,8 +1,6 @@
 Beep Beep
 =========
 
-<!-- Test push verification -->
-
 Marketplace ops dashboard built with Next.js for connecting an eBay account, syncing business policies, listing products, and managing SKUs. Uses App Router, NextAuth, Prisma/PostgreSQL, and Tailwind CSS.
 
 Features

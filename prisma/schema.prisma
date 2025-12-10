@@ -21,6 +21,7 @@ model User {
   ebayTokens           EbayToken?
   sessions             Session[]
   skuSettings          SkuSettings?
+  bannedKeywords       BannedKeyword[]
 }
 
 model Account {
@@ -92,4 +93,16 @@ model EbayBusinessPolicies {
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
   user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model BannedKeyword {
+  id        String   @id @default(cuid())
+  userId    String
+  keyword   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, keyword])
+  @@index([userId])
 }

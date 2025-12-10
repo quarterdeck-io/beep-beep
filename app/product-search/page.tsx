@@ -5,6 +5,7 @@ import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Html5QrcodeScanner } from "html5-qrcode"
+import { maskKeywords, fetchBannedKeywords } from "@/lib/keyword-masker"
 
 interface ProductData {
   title?: string
@@ -66,6 +67,8 @@ export default function ProductSearchPage() {
   const [increasingInventory, setIncreasingInventory] = useState(false)
   const [inventoryMessage, setInventoryMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
   
+  // Banned keywords state
+  const [bannedKeywords, setBannedKeywords] = useState<string[]>([])
   
   // Mean price tracking state
   const [isMeanPrice, setIsMeanPrice] = useState(false)
@@ -108,6 +111,30 @@ export default function ProductSearchPage() {
     return descriptionMap[condition] || ""
   }
   
+  // Helper function to calculate discounted price with minimum floor
+  const calculateDiscountedPrice = (originalPrice: string | number): { original: number; discounted: number; discountAmount: number; discountPercent: number } => {
+    const original = typeof originalPrice === 'string' ? parseFloat(originalPrice) || 0 : originalPrice
+    const discountPercent = 30 // 30% discount
+    const minimumPrice = 4.00 // $4 minimum
+    
+    // Calculate discounted price
+    const discounted = original * (1 - discountPercent / 100)
+    
+    // Apply minimum price floor
+    const finalPrice = Math.max(discounted, minimumPrice)
+    
+    // Calculate actual discount amount (may be less than 30% if minimum floor applies)
+    const actualDiscountAmount = original - finalPrice
+    const actualDiscountPercent = original > 0 ? (actualDiscountAmount / original) * 100 : 0
+    
+    return {
+      original,
+      discounted: finalPrice,
+      discountAmount: actualDiscountAmount,
+      discountPercent: actualDiscountPercent
+    }
+  }
+  
   // Helper function to add debug log
   const addDebugLog = (message: string) => {
     const timestamp = new Date().toLocaleTimeString()
@@ -130,6 +157,13 @@ export default function ProductSearchPage() {
     }
 
     checkEbayConnection()
+
+    // Fetch banned keywords
+    const loadBannedKeywords = async () => {
+      const keywords = await fetchBannedKeywords()
+      setBannedKeywords(keywords)
+    }
+    loadBannedKeywords()
   }, [])
 
   const performSearch = async (searchValue: string) => {
@@ -396,6 +430,11 @@ export default function ProductSearchPage() {
         })
       }
       
+      // Calculate discounted price for listing
+      const listingPrice = editedPrice || productData.price?.value || "0.00"
+      const priceInfo = calculateDiscountedPrice(listingPrice)
+      const finalListingPrice = priceInfo.discounted.toFixed(2)
+      
       const response = await fetch("/api/ebay/list", {
         method: "POST",
         headers: {
@@ -405,7 +444,7 @@ export default function ProductSearchPage() {
           // Editable fields
           title: editedTitle || productData.title || "",
           description: editedDescription || productData.shortDescription || productData.description || "",
-          price: editedPrice || productData.price?.value || "0.00",
+          price: finalListingPrice, // Use discounted price with minimum floor
           condition: editedCondition || "Used - Very Good",
           
           // Images - primary and additional
@@ -1139,18 +1178,18 @@ export default function ProductSearchPage() {
                 <button
                   onClick={handleIncreaseInventory}
                   disabled={increasingInventory}
-                  className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  className="w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-600 flex items-center justify-center gap-2 shadow-md hover:shadow-lg active:scale-[0.98]"
                 >
                   {increasingInventory ? (
                     <>
-                      <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                      <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
-                      Increasing...
+                      <span>Increasing...</span>
                     </>
                   ) : (
-                    "Increase existing product inventory by 1"
+                    <span>Increase existing product inventory by 1</span>
                   )}
                 </button>
               </div>
@@ -1288,7 +1327,7 @@ export default function ProductSearchPage() {
                         />
                       ) : (
                         <p className="mt-1 text-lg text-gray-900 dark:text-white">
-                          {productData.title || "No title"}
+                          {productData.title ? maskKeywords(productData.title, bannedKeywords) : "No title"}
                         </p>
                       )}
                     </div>
@@ -1308,42 +1347,102 @@ export default function ProductSearchPage() {
                         />
                       ) : (
                         <p className="mt-1 text-gray-900 dark:text-white whitespace-pre-wrap">
-                          {productData.shortDescription || productData.description || "No description"}
+                          {productData.shortDescription || productData.description
+                            ? maskKeywords(productData.shortDescription || productData.description || "", bannedKeywords)
+                            : "No description"}
                         </p>
                       )}
                     </div>
 
                     {/* Price - Editable */}
-                    {productData.price && (
-                      <div>
-                        <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">
-                          Price
-                          {isMeanPrice && (
-                            <span className="block text-xs text-blue-600 dark:text-blue-400 mt-1 font-normal">
-                              This is the mean price of latest 10 listing
-                            </span>
+                    {productData.price && (() => {
+                      const currentPrice = isEditing ? parseFloat(editedPrice) || 0 : parseFloat(productData.price.value || "0") || 0
+                      const priceInfo = calculateDiscountedPrice(currentPrice)
+                      const currency = productData.price.currency || "USD"
+                      
+                      return (
+                        <div>
+                          <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">
+                            Price
+                            {isMeanPrice && (
+                              <span className="block text-xs text-blue-600 dark:text-blue-400 mt-1 font-normal">
+                                This is the mean price of latest 10 listing
+                              </span>
+                            )}
+                          </h3>
+                          {isEditing ? (
+                            <div className="space-y-3">
+                              <div className="flex items-center gap-2">
+                                <span className="text-gray-600 dark:text-gray-400">{currency}</span>
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  value={editedPrice}
+                                  onChange={(e) => setEditedPrice(e.target.value)}
+                                  className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-2xl font-bold"
+                                  placeholder="0.00"
+                                />
+                              </div>
+                              {/* Show discount preview in edit mode */}
+                              {currentPrice > 0 && (
+                                <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3 border border-gray-200 dark:border-gray-600">
+                                  <div className="flex items-baseline gap-2 mb-1">
+                                    <span className="text-sm text-gray-500 dark:text-gray-400 line-through">
+                                      {currency} {priceInfo.original.toFixed(2)}
+                                    </span>
+                                    <span className="text-xl font-bold text-green-600 dark:text-green-400">
+                                      {currency} {priceInfo.discounted.toFixed(2)}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300">
+                                      Save {currency} {priceInfo.discountAmount.toFixed(2)} ({priceInfo.discountPercent.toFixed(1)}%)
+                                    </span>
+                                    {priceInfo.discounted === 4.00 && priceInfo.original > 4.00 && (
+                                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                                        (Minimum price applied)
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="space-y-2">
+                              {/* Original and Discounted Price Display */}
+                              <div className="flex items-baseline gap-3 flex-wrap">
+                                {priceInfo.original > priceInfo.discounted && (
+                                  <span className="text-lg text-gray-500 dark:text-gray-400 line-through">
+                                    {currency} {priceInfo.original.toFixed(2)}
+                                  </span>
+                                )}
+                                <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                                  {currency} {priceInfo.discounted.toFixed(2)}
+                                </span>
+                              </div>
+                              
+                              {/* Discount Badge */}
+                              {priceInfo.original > priceInfo.discounted && (
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="inline-flex items-center px-2.5 py-1 rounded-md text-sm font-semibold bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300">
+                                    Save {currency} {priceInfo.discountAmount.toFixed(2)}
+                                  </span>
+                                  <span className="inline-flex items-center px-2.5 py-1 rounded-md text-sm font-semibold bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300">
+                                    {priceInfo.discountPercent.toFixed(1)}% OFF
+                                  </span>
+                                  {priceInfo.discounted === 4.00 && priceInfo.original > 4.00 && (
+                                    <span className="text-xs text-gray-500 dark:text-gray-400 italic">
+                                      (Minimum price of {currency} 4.00 applied)
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
                           )}
-                        </h3>
-                        {isEditing ? (
-                          <div className="flex items-center gap-2">
-                            <span className="text-gray-600 dark:text-gray-400">{productData.price.currency || "USD"}</span>
-                            <input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              value={editedPrice}
-                              onChange={(e) => setEditedPrice(e.target.value)}
-                              className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-2xl font-bold"
-                              placeholder="0.00"
-                            />
-                          </div>
-                        ) : (
-                          <p className="mt-1 text-2xl font-bold text-blue-600 dark:text-blue-400">
-                            {productData.price.currency} {productData.price.value}
-                          </p>
-                        )}
-                      </div>
-                    )}
+                        </div>
+                      )
+                    })()}
 
                     {/* Condition - Editable */}
                     <div>

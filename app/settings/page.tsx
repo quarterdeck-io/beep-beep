@@ -36,6 +36,13 @@ export default function SettingsPage() {
   const [selectedFulfillmentPolicy, setSelectedFulfillmentPolicy] = useState<string>("")
   const [ebayConnected, setEbayConnected] = useState(false)
 
+  // Banned Keywords state
+  const [bannedKeywords, setBannedKeywords] = useState<Array<{ id: string; keyword: string }>>([])
+  const [newKeyword, setNewKeyword] = useState<string>("")
+  const [loadingKeywords, setLoadingKeywords] = useState(false)
+  const [savingKeyword, setSavingKeyword] = useState(false)
+  const [deletingKeyword, setDeletingKeyword] = useState<string | null>(null)
+
   // Fetch current settings on mount
   useEffect(() => {
     const fetchSettings = async () => {
@@ -117,6 +124,26 @@ export default function SettingsPage() {
     }
 
     checkEbayConnection()
+  }, [])
+
+  // Fetch banned keywords on mount
+  useEffect(() => {
+    const fetchBannedKeywords = async () => {
+      try {
+        setLoadingKeywords(true)
+        const res = await fetch("/api/settings/banned-keywords")
+        if (res.ok) {
+          const data = await res.json()
+          setBannedKeywords(data.keywords || [])
+        }
+      } catch (error) {
+        console.error("Failed to fetch banned keywords:", error)
+      } finally {
+        setLoadingKeywords(false)
+      }
+    }
+
+    fetchBannedKeywords()
   }, [])
 
   // Fetch available policies when user clicks to load them
@@ -278,6 +305,64 @@ export default function SettingsPage() {
       setMessage({ type: "error", text: "Failed to save eBay policies" })
     } finally {
       setSavingPolicies(false)
+    }
+  }
+
+  const handleAddKeyword = async () => {
+    if (!newKeyword || newKeyword.trim().length === 0) {
+      setMessage({ type: "error", text: "Please enter a keyword" })
+      return
+    }
+
+    setSavingKeyword(true)
+    setMessage(null)
+
+    try {
+      const res = await fetch("/api/settings/banned-keywords", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ keyword: newKeyword.trim() }),
+      })
+
+      const data = await res.json()
+
+      if (res.ok) {
+        setBannedKeywords([...bannedKeywords, data.keyword])
+        setNewKeyword("")
+        setMessage({ type: "success", text: "✓ Keyword added successfully" })
+      } else {
+        setMessage({ type: "error", text: data.error || "Failed to add keyword" })
+      }
+    } catch (error) {
+      setMessage({ type: "error", text: "Failed to add keyword" })
+    } finally {
+      setSavingKeyword(false)
+    }
+  }
+
+  const handleDeleteKeyword = async (id: string) => {
+    setDeletingKeyword(id)
+    setMessage(null)
+
+    try {
+      const res = await fetch(`/api/settings/banned-keywords?id=${id}`, {
+        method: "DELETE",
+      })
+
+      const data = await res.json()
+
+      if (res.ok) {
+        setBannedKeywords(bannedKeywords.filter(k => k.id !== id))
+        setMessage({ type: "success", text: "✓ Keyword removed successfully" })
+      } else {
+        setMessage({ type: "error", text: data.error || "Failed to remove keyword" })
+      }
+    } catch (error) {
+      setMessage({ type: "error", text: "Failed to remove keyword" })
+    } finally {
+      setDeletingKeyword(null)
     }
   }
 
@@ -589,6 +674,92 @@ export default function SettingsPage() {
                       </button>
                     </div>
                   </div>
+            )}
+          </div>
+
+          {/* Keyword Ban Card */}
+          <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6 mt-6">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+              Keyword Ban
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+              Add keywords to hide/mask when displaying products. These keywords will be replaced with asterisks (*) in product titles and descriptions.
+            </p>
+
+            {/* Add Keyword Form */}
+            <div className="mb-6">
+              <div className="flex gap-3">
+                <input
+                  type="text"
+                  value={newKeyword}
+                  onChange={(e) => setNewKeyword(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault()
+                      handleAddKeyword()
+                    }
+                  }}
+                  placeholder="Enter keyword to ban (e.g., DVD, Blu-Ray)"
+                  className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+                <button
+                  onClick={handleAddKeyword}
+                  disabled={savingKeyword || !newKeyword.trim()}
+                  className="px-6 py-2 bg-gray-800 dark:bg-gray-700 text-white rounded-md hover:bg-gray-700 dark:hover:bg-gray-600 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {savingKeyword ? "Adding..." : "Add Keyword"}
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                Keywords are case-insensitive and will match whole words only
+              </p>
+            </div>
+
+            {/* Banned Keywords List */}
+            {loadingKeywords ? (
+              <div className="text-center py-4">
+                <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">Loading keywords...</p>
+              </div>
+            ) : bannedKeywords.length === 0 ? (
+              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                <p>No banned keywords yet. Add keywords above to get started.</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                  Banned Keywords ({bannedKeywords.length})
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {bannedKeywords.map((keyword) => (
+                    <div
+                      key={keyword.id}
+                      className="flex items-center gap-2 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md"
+                    >
+                      <span className="text-sm font-medium text-red-700 dark:text-red-400">
+                        {keyword.keyword}
+                      </span>
+                      <button
+                        onClick={() => handleDeleteKeyword(keyword.id)}
+                        disabled={deletingKeyword === keyword.id}
+                        className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 transition-colors disabled:opacity-50"
+                        aria-label={`Remove ${keyword.keyword}`}
+                      >
+                        {deletingKeyword === keyword.id ? (
+                          <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                        ) : (
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        )}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
           </div>
         </div>
