@@ -124,6 +124,9 @@ export async function POST(req: Request) {
 
     const offer = offers[0]
     const offerId = offer.offerId
+    const offerStatus = offer.status
+    
+    console.log(`[INVENTORY] Found offer - ID: ${offerId}, Status: ${offerStatus}`)
     
     if (!offerId) {
       return NextResponse.json(
@@ -158,17 +161,44 @@ export async function POST(req: Request) {
     const currentQuantity = currentOffer.availableQuantity || 1
     const newQuantity = currentQuantity + 1
 
-    // Update the offer with new quantity (preserve all other fields)
-    const updatePayload = {
-      ...currentOffer,
+    console.log(`[INVENTORY] Current quantity: ${currentQuantity}, New quantity: ${newQuantity}`)
+    console.log(`[INVENTORY] Current offer structure:`, JSON.stringify(currentOffer, null, 2))
+
+    // Build update payload with only the fields that can be updated
+    // eBay requires specific fields for offer updates - must match the structure from GET
+    const updatePayload: any = {
+      sku: currentOffer.sku,
+      marketplaceId: currentOffer.marketplaceId || "EBAY_US",
+      format: currentOffer.format || "FIXED_PRICE",
       availableQuantity: newQuantity,
+      listingDescription: currentOffer.listingDescription || "",
+      listingDuration: currentOffer.listingDuration || "GTC",
+      pricingSummary: currentOffer.pricingSummary,
+      categoryId: currentOffer.categoryId,
     }
 
-    // Remove fields that shouldn't be in update request
-    delete updatePayload.offerId
-    delete updatePayload.listingId
-    delete updatePayload.status
-    delete updatePayload.marketplaceId // This is set in the URL path
+    // Add optional fields only if they exist in the original offer
+    if (currentOffer.includeCatalogProductDetails !== undefined) {
+      updatePayload.includeCatalogProductDetails = currentOffer.includeCatalogProductDetails
+    }
+
+    // Add listing policies if they exist
+    if (currentOffer.listingPolicies) {
+      updatePayload.listingPolicies = currentOffer.listingPolicies
+    }
+
+    // Add merchant location key if it exists (required for publishing)
+    if (currentOffer.merchantLocationKey) {
+      updatePayload.merchantLocationKey = currentOffer.merchantLocationKey
+    }
+
+    // Add aspects if they exist
+    if (currentOffer.product) {
+      updatePayload.product = currentOffer.product
+    }
+
+    console.log(`[INVENTORY] Update payload (keys only):`, Object.keys(updatePayload))
+    console.log(`[INVENTORY] Update payload (full):`, JSON.stringify(updatePayload, null, 2))
 
     const updateUrl = `${baseUrl}/sell/inventory/v1/offer/${offerId}`
     const updateResponse = await fetch(updateUrl, {
@@ -184,11 +214,46 @@ export async function POST(req: Request) {
     })
 
     if (!updateResponse.ok) {
-      const errorData = await updateResponse.json().catch(() => ({}))
+      const errorText = await updateResponse.text().catch(() => "")
+      let errorData = {}
+      try {
+        errorData = JSON.parse(errorText)
+      } catch {
+        errorData = { message: errorText }
+      }
+      console.error(`[INVENTORY] Failed to update offer:`, updateResponse.status, errorData)
       return NextResponse.json(
         { error: `Failed to update inventory: ${updateResponse.status}`, details: errorData },
         { status: updateResponse.status }
       )
+    }
+
+    // eBay returns 204 No Content on successful update, so no JSON to parse
+    console.log(`[INVENTORY] ✅ Offer update successful (status: ${updateResponse.status})`)
+    
+    // Verify the update was successful by fetching the updated offer
+    const verifyResponse = await fetch(getOfferUrl, {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        'Content-Language': 'en-US',
+        'Accept-Language': 'en-US',
+        'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
+      },
+    })
+    
+    if (verifyResponse.ok) {
+      const verifiedOffer = await verifyResponse.json()
+      const verifiedQuantity = verifiedOffer.availableQuantity
+      console.log(`[INVENTORY] Verified offer quantity after update:`, verifiedQuantity)
+      if (verifiedQuantity !== newQuantity) {
+        console.warn(`[INVENTORY] ⚠️ WARNING: Quantity mismatch! Expected ${newQuantity}, got ${verifiedQuantity}`)
+        // Still continue to publish, but note the discrepancy
+      } else {
+        console.log(`[INVENTORY] ✅ Quantity verified: ${verifiedQuantity}`)
+      }
+    } else {
+      console.warn(`[INVENTORY] ⚠️ Could not verify update (status: ${verifyResponse.status})`)
     }
 
     // Publish the updated offer
@@ -206,6 +271,7 @@ export async function POST(req: Request) {
 
     if (!publishResponse.ok) {
       const errorData = await publishResponse.json().catch(() => ({}))
+      console.error(`[INVENTORY] Failed to publish offer:`, publishResponse.status, errorData)
       // Even if publish fails, the quantity was updated
       return NextResponse.json(
         { 
@@ -218,10 +284,15 @@ export async function POST(req: Request) {
       )
     }
 
+    const publishResult = await publishResponse.json().catch(() => ({}))
+    console.log(`[INVENTORY] Publish response:`, publishResult)
+    console.log(`[INVENTORY] ✅ Successfully increased inventory to ${newQuantity} and published`)
+
     return NextResponse.json({
       success: true,
       newQuantity: newQuantity,
-      message: "Inventory increased and published successfully"
+      message: "Inventory increased and published successfully",
+      listingId: publishResult.listingId || null
     })
 
   } catch (error) {
