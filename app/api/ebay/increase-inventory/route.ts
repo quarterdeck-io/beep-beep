@@ -14,11 +14,11 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json()
-    const { sku } = body
+    const { sku, upc } = body
 
-    if (!sku || typeof sku !== "string") {
+    if (!sku && !upc) {
       return NextResponse.json(
-        { error: "SKU is required" },
+        { error: "Either SKU or UPC is required" },
         { status: 400 }
       )
     }
@@ -90,50 +90,173 @@ export async function POST(req: Request) {
       ? "https://api.sandbox.ebay.com"
       : "https://api.ebay.com"
 
-    // First, get all offers for this SKU to find the PUBLISHED one
-    // We need to search for offers by SKU and find the published/active one
-    const offersUrl = `${baseUrl}/sell/inventory/v1/offer?sku=${encodeURIComponent(sku)}&limit=25`
+    // Strategy: First try to find published offer by SKU, if that fails and we have UPC, search by UPC
+    let offers: any[] = []
+    let offersUrl = ""
     
-    const offersResponse = await fetch(offersUrl, {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-        'Content-Language': 'en-US',
-        'Accept-Language': 'en-US',
-        'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
-      },
-    })
-
-    if (!offersResponse.ok) {
-      const errorData = await offersResponse.json().catch(() => ({}))
-      return NextResponse.json(
-        { error: `Failed to find offer for SKU: ${offersResponse.status}`, details: errorData },
-        { status: offersResponse.status }
-      )
+    // First, try to find offers by SKU if provided
+    if (sku) {
+      offersUrl = `${baseUrl}/sell/inventory/v1/offer?sku=${encodeURIComponent(sku)}&limit=25`
+      console.log(`[INVENTORY] Searching offers by SKU: ${sku}`)
+    } else if (upc) {
+      // If no SKU but we have UPC, we need to search inventory items by UPC first
+      // Then find offers for those inventory items
+      console.log(`[INVENTORY] No SKU provided, searching by UPC: ${upc}`)
+      
+      // Get inventory items by UPC
+      const inventoryUrl = `${baseUrl}/sell/inventory/v1/inventory_item?limit=25&offset=0`
+      const inventoryResponse = await fetch(inventoryUrl, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+          'Content-Language': 'en-US',
+          'Accept-Language': 'en-US',
+          'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
+        },
+      })
+      
+      if (inventoryResponse.ok) {
+        const inventoryData = await inventoryResponse.json()
+        const inventoryItems = inventoryData.inventoryItems || []
+        
+        // Find inventory items matching the UPC
+        const matchingItems = []
+        for (const item of inventoryItems) {
+          const product = item.product
+          if (product) {
+            // Check UPC in various formats
+            const itemUpc = product.upc || product.gtin || (product.productIdentifiers?.find((pi: any) => pi.type === "UPC")?.value)
+            if (itemUpc && String(itemUpc).replace(/\D/g, "") === String(upc).replace(/\D/g, "")) {
+              matchingItems.push(item.sku)
+            }
+          }
+        }
+        
+        console.log(`[INVENTORY] Found ${matchingItems.length} inventory item(s) matching UPC`)
+        
+        // Now get offers for these SKUs
+        for (const itemSku of matchingItems) {
+          const itemOffersUrl = `${baseUrl}/sell/inventory/v1/offer?sku=${encodeURIComponent(itemSku)}&limit=25`
+          const itemOffersResponse = await fetch(itemOffersUrl, {
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+              'Content-Language': 'en-US',
+              'Accept-Language': 'en-US',
+              'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
+            },
+          })
+          
+          if (itemOffersResponse.ok) {
+            const itemOffersData = await itemOffersResponse.json()
+            offers.push(...(itemOffersData.offers || []))
+          }
+        }
+      }
     }
+    
+    // If we have a SKU, fetch offers by SKU first
+    if (sku && offers.length === 0) {
+      offersUrl = `${baseUrl}/sell/inventory/v1/offer?sku=${encodeURIComponent(sku)}&limit=25`
+      
+      const offersResponse = await fetch(offersUrl, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+          'Content-Language': 'en-US',
+          'Accept-Language': 'en-US',
+          'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
+        },
+      })
 
-    const offersData = await offersResponse.json()
-    const offers = offersData.offers || []
-    
-    console.log(`[INVENTORY] Found ${offers.length} offer(s) for SKU: ${sku}`)
-    
-    if (offers.length === 0) {
-      return NextResponse.json(
-        { error: "No offer found for this SKU" },
-        { status: 404 }
-      )
+      if (offersResponse.ok) {
+        const offersData = await offersResponse.json()
+        offers.push(...(offersData.offers || []))
+      }
     }
-
+    
+    console.log(`[INVENTORY] Found ${offers.length} offer(s) initially`)
+    
     // Find the PUBLISHED offer (the one that's actually listed on eBay)
     // Priority: PUBLISHED with listing > PUBLISHED > any other status
     let offer = offers.find((o: any) => o.status === "PUBLISHED" && o.listing?.listingId)
     if (!offer) {
       offer = offers.find((o: any) => o.status === "PUBLISHED")
     }
+    
+    // If no published offer found and we have UPC, search by UPC to find published listing
+    if (!offer && upc) {
+      console.log(`[INVENTORY] No published offer found by SKU, searching by UPC: ${upc}`)
+      
+      // Get all inventory items
+      const inventoryUrl = `${baseUrl}/sell/inventory/v1/inventory_item?limit=50&offset=0`
+      const inventoryResponse = await fetch(inventoryUrl, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+          'Content-Language': 'en-US',
+          'Accept-Language': 'en-US',
+          'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
+        },
+      })
+      
+      if (inventoryResponse.ok) {
+        const inventoryData = await inventoryResponse.json()
+        const inventoryItems = inventoryData.inventoryItems || []
+        
+        // Find inventory items matching the UPC
+        const matchingSkus: string[] = []
+        for (const item of inventoryItems) {
+          const product = item.product
+          if (product) {
+            // Check UPC in various formats
+            const itemUpc = product.upc?.[0] || product.gtin || (product.productIdentifiers?.find((pi: any) => pi.type === "UPC")?.value)
+            if (itemUpc && String(itemUpc).replace(/\D/g, "") === String(upc).replace(/\D/g, "")) {
+              matchingSkus.push(item.sku)
+            }
+          }
+        }
+        
+        console.log(`[INVENTORY] Found ${matchingSkus.length} inventory item(s) matching UPC`)
+        
+        // Get offers for all matching SKUs
+        for (const itemSku of matchingSkus) {
+          const itemOffersUrl = `${baseUrl}/sell/inventory/v1/offer?sku=${encodeURIComponent(itemSku)}&limit=25`
+          const itemOffersResponse = await fetch(itemOffersUrl, {
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+              'Content-Language': 'en-US',
+              'Accept-Language': 'en-US',
+              'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
+            },
+          })
+          
+          if (itemOffersResponse.ok) {
+            const itemOffersData = await itemOffersResponse.json()
+            offers.push(...(itemOffersData.offers || []))
+          }
+        }
+        
+        // Now find published offer from all offers
+        offer = offers.find((o: any) => o.status === "PUBLISHED" && o.listing?.listingId)
+        if (!offer) {
+          offer = offers.find((o: any) => o.status === "PUBLISHED")
+        }
+      }
+    }
+    
     if (!offer) {
-      // If no published offer, use the first one but warn
-      offer = offers[0]
-      console.warn(`[INVENTORY] ⚠️ No published offer found. Using offer with status: ${offer.status}`)
+      // If still no published offer, use the first one but warn
+      if (offers.length > 0) {
+        offer = offers[0]
+        console.warn(`[INVENTORY] ⚠️ No published offer found. Using offer with status: ${offer.status}`)
+      } else {
+        return NextResponse.json(
+          { error: "No offer found for this product. Please ensure the item is listed on eBay." },
+          { status: 404 }
+        )
+      }
     }
 
     const offerId = offer.offerId

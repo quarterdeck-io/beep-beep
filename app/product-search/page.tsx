@@ -301,8 +301,8 @@ export default function ProductSearchPage() {
   
   // Handle increasing inventory for existing listing
   const handleIncreaseInventory = async () => {
-    if (!duplicateSku) {
-      setInventoryMessage({ type: "error", text: "No SKU found to increase inventory" })
+    if (!duplicateSku && !duplicateUpc && !upc) {
+      setInventoryMessage({ type: "error", text: "No product information found to increase inventory" })
       return
     }
     
@@ -315,7 +315,10 @@ export default function ProductSearchPage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ sku: duplicateSku }),
+        body: JSON.stringify({ 
+          sku: duplicateSku || "",
+          upc: duplicateUpc || upc || "" // Pass UPC to find published listing
+        }),
       })
       
       const data = await res.json()
