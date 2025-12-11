@@ -64,6 +64,7 @@ export default function ProductSearchPage() {
   const [duplicateSku, setDuplicateSku] = useState<string>("")
   const [duplicateUpc, setDuplicateUpc] = useState<string>("")
   const [checkingDuplicates, setCheckingDuplicates] = useState(false)
+  const [duplicateCheckComplete, setDuplicateCheckComplete] = useState(false)
   const [increasingInventory, setIncreasingInventory] = useState(false)
   const [inventoryMessage, setInventoryMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
   
@@ -175,6 +176,7 @@ export default function ProductSearchPage() {
     setHasDuplicates(false) // Clear duplicate state for new search
     setDuplicateSku("")
     setDuplicateUpc("")
+    setDuplicateCheckComplete(false) // Reset duplicate check status
     setUpc(trimmedUpc) // Update UPC state for display
     setLoading(true)
 
@@ -278,6 +280,7 @@ export default function ProductSearchPage() {
     setHasDuplicates(false) // Clear duplicate detection
     setDuplicateSku("")
     setDuplicateUpc("")
+    setDuplicateCheckComplete(false) // Clear duplicate check status
     setInventoryMessage(null) // Clear inventory increase message
   }
   
@@ -289,6 +292,7 @@ export default function ProductSearchPage() {
     
     const trimmedUpc = upcCode.trim()
     setCheckingDuplicates(true)
+    setDuplicateCheckComplete(false)
     setHasDuplicates(false)
     setDuplicateSku("")
     setDuplicateUpc("")
@@ -317,17 +321,20 @@ export default function ProductSearchPage() {
           // Reset to normal SKU preview if no duplicates
           fetchSkuPreview(false)
         }
+        setDuplicateCheckComplete(true)
       } else {
         // If API call failed, clear duplicate state
         setHasDuplicates(false)
         setDuplicateSku("")
         setDuplicateUpc("")
+        setDuplicateCheckComplete(true)
       }
     } catch (error) {
       // On error, clear duplicate state (don't show false positives)
       setHasDuplicates(false)
       setDuplicateSku("")
       setDuplicateUpc("")
+      setDuplicateCheckComplete(true)
     } finally {
       setCheckingDuplicates(false)
     }
@@ -1192,6 +1199,25 @@ export default function ProductSearchPage() {
                     <span>Increase existing product inventory by 1</span>
                   )}
                 </button>
+              </div>
+            </div>
+          )}
+
+          {/* No Duplicates Found Message */}
+          {!hasDuplicates && duplicateCheckComplete && productData && (
+            <div className="mt-4 mb-4 p-4 bg-green-50 dark:bg-green-900/20 border border-green-300 dark:border-green-700 rounded-lg">
+              <div className="flex items-center gap-3">
+                <svg className="w-6 h-6 text-green-600 dark:text-green-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div className="flex-1">
+                  <h3 className="text-base font-bold text-green-700 dark:text-green-400 mb-1">
+                    No Duplicates Found
+                  </h3>
+                  <p className="text-sm text-green-600 dark:text-green-300">
+                    <span className="font-semibold">UPC:</span> <span className="font-mono font-semibold">{upc}</span> - This product is not in your eBay inventory. You can proceed to list it.
+                  </p>
+                </div>
               </div>
             </div>
           )}
