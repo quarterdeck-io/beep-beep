@@ -691,6 +691,48 @@ export default function ProductSearchPage() {
       return
     }
 
+    // Add global error handler to catch library errors
+    const handleGlobalError = (event: ErrorEvent) => {
+      // Check if error is related to toString and scanner
+      if (event.message && (event.message.includes('toString') || event.message.includes('is not an object')) && scannerActive) {
+        try {
+          addDebugLog(`⚠️ Caught global error: ${event.message || 'Unknown error'}`)
+          // Prevent the error from breaking the scanner
+          if (event.preventDefault) {
+            event.preventDefault()
+          }
+          // Update status but don't stop scanning
+          setScanningStatus("Scanning...")
+          return false
+        } catch (err) {
+          // If error handling fails, just log and continue
+          console.error("Error in global error handler:", err)
+          return false
+        }
+      }
+      return true
+    }
+    
+    // Also add unhandled rejection handler for promise errors
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      if (event.reason && typeof event.reason === 'object') {
+        const errorMsg = event.reason?.message || String(event.reason)
+        if ((errorMsg.includes('toString') || errorMsg.includes('is not an object')) && scannerActive) {
+          try {
+            addDebugLog(`⚠️ Caught unhandled promise rejection: ${errorMsg}`)
+            setScanningStatus("Scanning...")
+            event.preventDefault()
+          } catch (err) {
+            console.error("Error in unhandled rejection handler:", err)
+          }
+        }
+      }
+    }
+
+    // Add the error handlers
+    window.addEventListener('error', handleGlobalError)
+    window.addEventListener('unhandledrejection', handleUnhandledRejection)
+
     // Wait for DOM to be ready
     addDebugLog("🔍 Setting up scanner initialization timer...")
     const timer = setTimeout(() => {
@@ -745,8 +787,9 @@ export default function ProductSearchPage() {
         scannerRef.current = scanner
 
         addDebugLog("🔍 Starting scanner.render()...")
-        scanner.render(
-          (decodedText: any) => {
+        try {
+          scanner.render(
+            (decodedText: any) => {
             try {
               // Successfully scanned - validate it looks like a UPC
               // Add comprehensive defensive checks for all possible value types
@@ -853,13 +896,34 @@ export default function ProductSearchPage() {
                 // For objects, safely convert to string
                 try {
                   if (errorMessage instanceof Error) {
-                    errorStr = errorMessage.message || errorMessage.toString()
-                  } else if (typeof errorMessage.toString === 'function') {
-                    errorStr = errorMessage.toString()
+                    // Safely get message or toString
+                    try {
+                      errorStr = (errorMessage.message && String(errorMessage.message)) || 
+                                (typeof errorMessage.toString === 'function' ? errorMessage.toString() : "[Error]")
+                    } catch {
+                      errorStr = "[Error]"
+                    }
+                  } else if (errorMessage && typeof errorMessage.toString === 'function') {
+                    // Double check errorMessage exists and toString is callable before calling it
+                    try {
+                      errorStr = errorMessage.toString()
+                      // Validate the result is actually a string
+                      if (typeof errorStr !== 'string') {
+                        errorStr = String(errorStr)
+                      }
+                    } catch (toStringErr) {
+                      // If toString throws, try JSON.stringify as fallback
+                      try {
+                        errorStr = JSON.stringify(errorMessage)
+                      } catch {
+                        errorStr = "[Error object - conversion failed]"
+                      }
+                    }
                   } else {
                     errorStr = JSON.stringify(errorMessage)
                   }
-                } catch {
+                } catch (err) {
+                  // If anything fails, use a safe fallback
                   errorStr = "[Error object]"
                 }
               } else {
@@ -915,7 +979,19 @@ export default function ProductSearchPage() {
               setScanningStatus("Scanning...")
             }
           }
-        )
+          )
+        } catch (renderError: any) {
+          // Catch any errors during scanner.render() initialization
+          const renderErrMsg = renderError && typeof renderError === 'object' && 'message' in renderError
+            ? String(renderError.message)
+            : String(renderError || "Unknown render error")
+          addDebugLog(`❌ Error during scanner.render(): ${renderErrMsg}`)
+          console.error("Scanner render error:", renderError)
+          setError(`Failed to start scanner: ${renderErrMsg}`)
+          setScannerActive(false)
+          setScanningStatus("")
+          return
+        }
         
         addDebugLog("✅ Scanner.render() called successfully")
         // Update status after initialization
@@ -957,6 +1033,9 @@ export default function ProductSearchPage() {
       addDebugLog("🔍 useEffect cleanup function called")
       clearTimeout(timer)
       addDebugLog("🔍 Timer cleared")
+      // Remove error handlers
+      window.removeEventListener('error', handleGlobalError)
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection)
       // Cleanup scanner if component unmounts or scannerActive changes
       if (scannerRef.current) {
         addDebugLog("🔍 Cleaning up scanner in useEffect cleanup")
