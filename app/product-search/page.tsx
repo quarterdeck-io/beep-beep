@@ -445,7 +445,8 @@ export default function ProductSearchPage() {
     setListingLoading(true)
     setListingError(null)
     setListingSuccess(null)
-    setShowAspectForm(false)
+    // Don't clear showAspectForm here - let it be cleared only after successful listing
+    // This preserves aspectDefinitions state for retry attempts
     
     try {
       // Merge user-provided aspects with existing aspects
@@ -479,9 +480,36 @@ export default function ProductSearchPage() {
           if (value && typeof value === 'string' && value.trim() !== "") {
             // Use the exact aspect name from aspectDefinitions if available
             // This ensures we match exactly what eBay expects
-            const aspectDef = aspectDefinitions.find((a: any) => 
+            // Try multiple matching strategies to find the correct aspect name
+            let aspectDef = aspectDefinitions.find((a: any) => 
               a.name && a.name.toLowerCase() === userKey.toLowerCase()
             )
+            
+            // If not found, try partial matching
+            if (!aspectDef && aspectDefinitions.length > 0) {
+              aspectDef = aspectDefinitions.find((a: any) => 
+                a.name && (
+                  a.name.toLowerCase().includes(userKey.toLowerCase()) ||
+                  userKey.toLowerCase().includes(a.name.toLowerCase())
+                )
+              )
+            }
+            
+            // If still not found, try matching against missingAspects (which contains the exact eBay names)
+            if (!aspectDef && missingAspects.length > 0) {
+              const matchingMissingAspect = missingAspects.find((a: string) => 
+                a.toLowerCase() === userKey.toLowerCase() ||
+                a.toLowerCase().includes(userKey.toLowerCase()) ||
+                userKey.toLowerCase().includes(a.toLowerCase())
+              )
+              if (matchingMissingAspect) {
+                // Use the exact name from missingAspects
+                mergedAspects[matchingMissingAspect] = [value.trim()]
+                console.log(`Mapped aspect "${userKey}" -> "${matchingMissingAspect}" (from missingAspects) with value:`, value.trim())
+                return // Skip the rest of this iteration
+              }
+            }
+            
             const exactAspectName = aspectDef ? aspectDef.name : userKey
             
             // Ensure the value is stored as an array (eBay format)
@@ -554,15 +582,45 @@ export default function ProductSearchPage() {
         // Check if this is a missing item specifics error
         if (data.action === "missing_item_specifics" && data.missingItemSpecifics) {
           setMissingAspects(data.missingItemSpecifics)
-          setAspectDefinitions(data.aspectDefinitions || [])
+          // Preserve existing aspectDefinitions if new ones aren't provided, otherwise update
+          if (data.aspectDefinitions && data.aspectDefinitions.length > 0) {
+            setAspectDefinitions(data.aspectDefinitions)
+          } else if (aspectDefinitions.length === 0) {
+            // Only set empty array if we don't have any existing definitions
+            setAspectDefinitions([])
+          }
+          // If we have existing definitions and no new ones, keep the existing ones
           
-          // Pre-fill form with suggested values if available
+          // Pre-fill form with user's previous input if retrying, otherwise use suggested values
           const prefillAspects: Record<string, string> = {}
-          data.aspectDefinitions?.forEach((def: any) => {
-            if (def.suggestedValue) {
+          
+          // First, preserve user's previous input if this is a retry
+          if (userProvidedAspects && Object.keys(userProvidedAspects).length > 0) {
+            Object.keys(userProvidedAspects).forEach(key => {
+              if (userProvidedAspects[key] && userProvidedAspects[key].trim() !== "") {
+                // Map to correct aspect name from missingAspects or aspectDefinitions
+                const matchingAspect = data.missingItemSpecifics.find((a: string) => 
+                  a.toLowerCase() === key.toLowerCase() ||
+                  a.toLowerCase().includes(key.toLowerCase()) ||
+                  key.toLowerCase().includes(a.toLowerCase())
+                )
+                if (matchingAspect) {
+                  prefillAspects[matchingAspect] = userProvidedAspects[key]
+                } else {
+                  prefillAspects[key] = userProvidedAspects[key]
+                }
+              }
+            })
+          }
+          
+          // Then, fill in suggested values for any missing aspects
+          const currentDefs = data.aspectDefinitions || aspectDefinitions
+          currentDefs.forEach((def: any) => {
+            if (def.suggestedValue && !prefillAspects[def.name]) {
               prefillAspects[def.name] = def.suggestedValue
             }
           })
+          
           setUserProvidedAspects(prefillAspects)
           
           setShowAspectForm(true)
@@ -622,6 +680,12 @@ export default function ProductSearchPage() {
         }
         throw new Error(errorMessage)
       }
+      
+      // Only clear aspect form and definitions on successful listing
+      setShowAspectForm(false)
+      setMissingAspects([])
+      setAspectDefinitions([])
+      setUserProvidedAspects({})
       
       setListingSuccess(data.listingUrl || data.message || "Product listed successfully!")
       // Capture the SKU that was used for this listing and calculate next SKU

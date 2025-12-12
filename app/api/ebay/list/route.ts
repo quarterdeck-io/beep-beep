@@ -474,6 +474,34 @@ export async function POST(req: Request) {
         
         if (missingAspects.length > 0) {
           console.warn("Missing required aspects detected:", missingAspects)
+          
+          // Build aspect definitions for the missing aspects
+          const missingAspectDefinitions = missingAspects.map((missingAspect: string) => {
+            // Find the aspect definition from taxonomy API
+            const aspectDef = aspectDefinitions.find((a: any) => {
+              const aspectName = a.localizedAspectName || a.aspectName
+              return aspectName === missingAspect || 
+                     aspectName?.toLowerCase() === missingAspect.toLowerCase()
+            })
+            
+            if (aspectDef) {
+              return {
+                name: aspectDef.localizedAspectName || aspectDef.aspectName,
+                required: true,
+                values: aspectDef.aspectValues?.map((v: any) => v.localizedValue || v.value) || [],
+                suggestedValue: extractAspectValue(missingAspect, shortDescription || description || title || "")
+              }
+            } else {
+              // Fallback: create basic definition if not found
+              return {
+                name: missingAspect,
+                required: true,
+                values: [],
+                suggestedValue: extractAspectValue(missingAspect, shortDescription || description || title || "")
+              }
+            }
+          })
+          
           return NextResponse.json(
             {
               error: `Missing required item specifics for this category`,
@@ -484,14 +512,8 @@ export async function POST(req: Request) {
               hint: `This category requires the following item specifics: ${missingAspects.join(", ")}. Please provide these details before listing.`,
               action: "missing_item_specifics",
               canRetry: false,
-              // Provide aspect definitions for UI
-              aspectDefinitions: aspectDefinitions
-                .filter((a: any) => a.aspectConstraint?.aspectRequired === true)
-                .map((a: any) => ({
-                  name: a.localizedAspectName || a.aspectName,
-                  required: true,
-                  values: a.aspectValues?.map((v: any) => v.localizedValue || v.value) || []
-                }))
+              // Provide aspect definitions for UI - always include them
+              aspectDefinitions: missingAspectDefinitions
             },
             { status: 400 }
           )
