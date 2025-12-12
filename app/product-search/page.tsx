@@ -808,12 +808,8 @@ export default function ProductSearchPage() {
           (errorMessage) => {
             try {
               // Error callback - update status for user feedback
-              // Convert errorMessage to string safely
-              const errorStr = errorMessage 
-                ? (typeof errorMessage === 'string' 
-                    ? errorMessage 
-                    : (errorMessage.toString ? errorMessage.toString() : String(errorMessage)))
-                : ""
+              // Convert errorMessage to string safely - String() handles all types including undefined/null
+              const errorStr: string = errorMessage != null ? String(errorMessage) : ""
               
               // NotFoundException is normal - no barcode in frame yet
               // Don't log every NotFoundException to avoid spam
