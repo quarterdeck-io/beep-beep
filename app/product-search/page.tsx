@@ -747,61 +747,94 @@ export default function ProductSearchPage() {
         addDebugLog("🔍 Starting scanner.render()...")
         scanner.render(
           (decodedText) => {
-            // Successfully scanned - validate it looks like a UPC
-            addDebugLog("✅ Barcode detected!")
-            addDebugLog(`✅ Raw decoded text: "${decodedText}"`)
-            addDebugLog(`✅ Decoded text type: ${typeof decodedText}, length: ${decodedText.length}`)
-            
-            setScanningStatus("Barcode/QR Code detected!")
-            const cleanedText = decodedText.trim()
-            addDebugLog(`✅ Cleaned text: "${cleanedText}"`)
-            
-            // Basic validation: UPC codes are typically 8, 12, or 13 digits
-            const isValidUPC = /^\d{8,13}$/.test(cleanedText)
-            addDebugLog(`✅ Is valid UPC format: ${isValidUPC}`)
-            
-            if (isValidUPC) {
-              addDebugLog(`✅ Setting UPC value: ${cleanedText}`)
-              setUpc(cleanedText)
-              // Small delay to show success message
-              setTimeout(() => {
-                addDebugLog("🔍 Stopping scanner after successful scan")
-                setScanningStatus("Searching...")
-                stopScanner()
-                // Auto-trigger search after scanning
-                addDebugLog("🔍 Auto-triggering search...")
-                performSearch(cleanedText)
-              }, 500)
-            } else {
-              // Not a valid UPC format, but still use it (might be EAN or other format)
-              addDebugLog(`⚠️ Not standard UPC format, but using value: ${cleanedText}`)
-              setUpc(cleanedText)
-              setTimeout(() => {
-                addDebugLog("🔍 Stopping scanner after scan (non-UPC format)")
-                setScanningStatus("Searching...")
-                stopScanner()
-                // Auto-trigger search after scanning
-                addDebugLog("🔍 Auto-triggering search...")
-                performSearch(cleanedText)
-              }, 500)
+            try {
+              // Successfully scanned - validate it looks like a UPC
+              // Add defensive checks for undefined/null values
+              if (!decodedText) {
+                addDebugLog("⚠️ Decoded text is empty or undefined")
+                return
+              }
+              
+              // Convert to string if it's not already
+              const decodedTextStr = String(decodedText || "")
+              if (!decodedTextStr || decodedTextStr.trim().length === 0) {
+                addDebugLog("⚠️ Decoded text is empty after conversion")
+                return
+              }
+              
+              addDebugLog("✅ Barcode detected!")
+              addDebugLog(`✅ Raw decoded text: "${decodedTextStr}"`)
+              addDebugLog(`✅ Decoded text type: ${typeof decodedTextStr}, length: ${decodedTextStr.length}`)
+              
+              setScanningStatus("Barcode/QR Code detected!")
+              const cleanedText = decodedTextStr.trim()
+              addDebugLog(`✅ Cleaned text: "${cleanedText}"`)
+              
+              // Basic validation: UPC codes are typically 8, 12, or 13 digits
+              const isValidUPC = /^\d{8,13}$/.test(cleanedText)
+              addDebugLog(`✅ Is valid UPC format: ${isValidUPC}`)
+              
+              if (isValidUPC) {
+                addDebugLog(`✅ Setting UPC value: ${cleanedText}`)
+                setUpc(cleanedText)
+                // Small delay to show success message
+                setTimeout(() => {
+                  addDebugLog("🔍 Stopping scanner after successful scan")
+                  setScanningStatus("Searching...")
+                  stopScanner()
+                  // Auto-trigger search after scanning
+                  addDebugLog("🔍 Auto-triggering search...")
+                  performSearch(cleanedText)
+                }, 500)
+              } else {
+                // Not a valid UPC format, but still use it (might be EAN or other format)
+                addDebugLog(`⚠️ Not standard UPC format, but using value: ${cleanedText}`)
+                setUpc(cleanedText)
+                setTimeout(() => {
+                  addDebugLog("🔍 Stopping scanner after scan (non-UPC format)")
+                  setScanningStatus("Searching...")
+                  stopScanner()
+                  // Auto-trigger search after scanning
+                  addDebugLog("🔍 Auto-triggering search...")
+                  performSearch(cleanedText)
+                }, 500)
+              }
+            } catch (err: any) {
+              addDebugLog(`❌ Error processing decoded text: ${err?.message || "Unknown error"}`)
+              console.error("Error processing barcode scan:", err)
+              // Don't stop scanning on error, just log it
             }
           },
           (errorMessage) => {
-            // Error callback - update status for user feedback
-            if (errorMessage && !errorMessage.includes("NotFoundException")) {
+            try {
+              // Error callback - update status for user feedback
+              // Convert errorMessage to string safely
+              const errorStr = errorMessage 
+                ? (typeof errorMessage === 'string' 
+                    ? errorMessage 
+                    : (errorMessage.toString ? errorMessage.toString() : String(errorMessage)))
+                : ""
+              
+              // NotFoundException is normal - no barcode in frame yet
+              // Don't log every NotFoundException to avoid spam
+              if (!errorStr || errorStr.includes("NotFoundException")) {
+                setScanningStatus("Scanning...")
+                return
+              }
+              
               // Clear any existing cooldown
               if (errorCooldownRef.current) {
                 clearTimeout(errorCooldownRef.current)
               }
               
-              addDebugLog(`⚠️ Scanner error: ${errorMessage}`)
+              addDebugLog(`⚠️ Scanner error: ${errorStr}`)
               setScanningStatus("Error detected - pausing...")
               
               // Add setTimeout to pause scanning after error before continuing
               errorCooldownRef.current = setTimeout(() => {
                 addDebugLog("✅ Resuming scan after error cooldown")
                 // Show scanning status
-                if (errorMessage.includes("No MultiFormat Readers")) {
+                if (errorStr.includes("No MultiFormat Readers")) {
                   addDebugLog("⚠️ No MultiFormat Readers error")
                   setScanningStatus("Waiting for barcode...")
                 } else {
@@ -810,9 +843,10 @@ export default function ProductSearchPage() {
                 }
                 errorCooldownRef.current = null
               }, 1000) // Wait 1 second before resuming after error
-            } else {
-              // NotFoundException is normal - no barcode in frame yet
-              // Don't log every NotFoundException to avoid spam
+            } catch (err: any) {
+              // If error handling itself fails, just log and continue
+              console.error("Error in scanner error callback:", err)
+              addDebugLog(`❌ Error in error handler: ${err?.message || "Unknown"}`)
               setScanningStatus("Scanning...")
             }
           }
