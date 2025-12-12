@@ -74,6 +74,10 @@ export default function ProductSearchPage() {
   // Mean price tracking state
   const [isMeanPrice, setIsMeanPrice] = useState(false)
   
+  // Discount settings state
+  const [discountPercentage, setDiscountPercentage] = useState<number>(30)
+  const [minimumPrice, setMinimumPrice] = useState<number>(4.0)
+  
   // Available conditions for dropdown
   const conditions = [
     "Used - Very Good",
@@ -115,16 +119,18 @@ export default function ProductSearchPage() {
   // Helper function to calculate discounted price with minimum floor
   const calculateDiscountedPrice = (originalPrice: string | number): { original: number; discounted: number; discountAmount: number; discountPercent: number } => {
     const original = typeof originalPrice === 'string' ? parseFloat(originalPrice) || 0 : originalPrice
-    const discountPercent = 30 // 30% discount
-    const minimumPrice = 4.00 // $4 minimum
+    
+    // Use settings values (with defaults if not loaded yet)
+    const discountPercent = discountPercentage || 30
+    const minPrice = minimumPrice || 4.0
     
     // Calculate discounted price
     const discounted = original * (1 - discountPercent / 100)
     
     // Apply minimum price floor
-    const finalPrice = Math.max(discounted, minimumPrice)
+    const finalPrice = Math.max(discounted, minPrice)
     
-    // Calculate actual discount amount (may be less than 30% if minimum floor applies)
+    // Calculate actual discount amount (may be less than configured % if minimum floor applies)
     const actualDiscountAmount = original - finalPrice
     const actualDiscountPercent = original > 0 ? (actualDiscountAmount / original) * 100 : 0
     
@@ -165,6 +171,24 @@ export default function ProductSearchPage() {
       setBannedKeywords(keywords)
     }
     loadBannedKeywords()
+
+    // Fetch discount settings
+    const loadDiscountSettings = async () => {
+      try {
+        const res = await fetch("/api/settings/discount")
+        if (res.ok) {
+          const data = await res.json()
+          setDiscountPercentage(data.discountPercentage || 30)
+          setMinimumPrice(data.minimumPrice || 4.0)
+        }
+      } catch (error) {
+        console.error("Failed to fetch discount settings:", error)
+        // Use defaults if fetch fails
+        setDiscountPercentage(30)
+        setMinimumPrice(4.0)
+      }
+    }
+    loadDiscountSettings()
   }, [])
 
   const performSearch = async (searchValue: string) => {
