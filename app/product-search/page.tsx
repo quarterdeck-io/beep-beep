@@ -5,7 +5,7 @@ import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Html5QrcodeScanner } from "html5-qrcode"
-import { maskKeywords, fetchBannedKeywords } from "@/lib/keyword-masker"
+import { removeKeywords, fetchBannedKeywords } from "@/lib/keyword-masker"
 
 interface ProductData {
   title?: string
@@ -1353,7 +1353,7 @@ export default function ProductSearchPage() {
                         />
                       ) : (
                         <p className="mt-1 text-lg text-gray-900 dark:text-white">
-                          {productData.title ? maskKeywords(productData.title, bannedKeywords) : "No title"}
+                          {productData.title ? removeKeywords(productData.title, bannedKeywords) : "No title"}
                         </p>
                       )}
                     </div>
@@ -1373,9 +1373,7 @@ export default function ProductSearchPage() {
                         />
                       ) : (
                         <p className="mt-1 text-gray-900 dark:text-white whitespace-pre-wrap">
-                          {productData.shortDescription || productData.description
-                            ? maskKeywords(productData.shortDescription || productData.description || "", bannedKeywords)
-                            : "No description"}
+                          {productData.shortDescription || productData.description || "No description"}
                         </p>
                       )}
                     </div>
