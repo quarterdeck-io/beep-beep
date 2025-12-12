@@ -746,17 +746,44 @@ export default function ProductSearchPage() {
 
         addDebugLog("🔍 Starting scanner.render()...")
         scanner.render(
-          (decodedText) => {
+          (decodedText: any) => {
             try {
               // Successfully scanned - validate it looks like a UPC
-              // Add defensive checks for undefined/null values
-              if (!decodedText) {
-                addDebugLog("⚠️ Decoded text is empty or undefined")
+              // Add comprehensive defensive checks for all possible value types
+              if (decodedText === null || decodedText === undefined) {
+                addDebugLog("⚠️ Decoded text is null or undefined")
                 return
               }
               
-              // Convert to string if it's not already
-              const decodedTextStr = String(decodedText || "")
+              // Convert to string safely - handle all types
+              let decodedTextStr = ""
+              if (typeof decodedText === 'string') {
+                decodedTextStr = decodedText
+              } else if (typeof decodedText === 'number' || typeof decodedText === 'boolean') {
+                decodedTextStr = String(decodedText)
+              } else if (typeof decodedText === 'object') {
+                // For objects, try to extract meaningful string
+                try {
+                  if (decodedText.toString && typeof decodedText.toString === 'function') {
+                    decodedTextStr = decodedText.toString()
+                  } else {
+                    decodedTextStr = JSON.stringify(decodedText)
+                  }
+                } catch {
+                  addDebugLog("⚠️ Failed to convert decoded text object to string")
+                  return
+                }
+              } else {
+                // Fallback for any other type
+                try {
+                  decodedTextStr = String(decodedText)
+                } catch {
+                  addDebugLog("⚠️ Failed to convert decoded text to string")
+                  return
+                }
+              }
+              
+              // Validate the string is not empty after conversion
               if (!decodedTextStr || decodedTextStr.trim().length === 0) {
                 addDebugLog("⚠️ Decoded text is empty after conversion")
                 return
@@ -800,20 +827,53 @@ export default function ProductSearchPage() {
                 }, 500)
               }
             } catch (err: any) {
-              addDebugLog(`❌ Error processing decoded text: ${err?.message || "Unknown error"}`)
+              // Comprehensive error handling
+              const errMsg = err && typeof err === 'object' && 'message' in err 
+                ? String(err.message) 
+                : String(err || "Unknown error")
+              addDebugLog(`❌ Error processing decoded text: ${errMsg}`)
               console.error("Error processing barcode scan:", err)
               // Don't stop scanning on error, just log it
             }
           },
-          (errorMessage) => {
+          (errorMessage: any) => {
             try {
               // Error callback - update status for user feedback
-              // Convert errorMessage to string safely - String() handles all types including undefined/null
-              const errorStr: string = errorMessage != null ? String(errorMessage) : ""
+              // Convert errorMessage to string safely with comprehensive type handling
+              let errorStr = ""
+              
+              // Handle all possible types safely
+              if (errorMessage === null || errorMessage === undefined) {
+                errorStr = ""
+              } else if (typeof errorMessage === 'string') {
+                errorStr = errorMessage
+              } else if (typeof errorMessage === 'number' || typeof errorMessage === 'boolean') {
+                errorStr = String(errorMessage)
+              } else if (typeof errorMessage === 'object') {
+                // For objects, safely convert to string
+                try {
+                  if (errorMessage instanceof Error) {
+                    errorStr = errorMessage.message || errorMessage.toString()
+                  } else if (typeof errorMessage.toString === 'function') {
+                    errorStr = errorMessage.toString()
+                  } else {
+                    errorStr = JSON.stringify(errorMessage)
+                  }
+                } catch {
+                  errorStr = "[Error object]"
+                }
+              } else {
+                // Fallback for any other type
+                try {
+                  errorStr = String(errorMessage)
+                } catch {
+                  errorStr = "[Unknown error]"
+                }
+              }
               
               // NotFoundException is normal - no barcode in frame yet
               // Don't log every NotFoundException to avoid spam
-              if (!errorStr || errorStr.includes("NotFoundException")) {
+              if (!errorStr || errorStr.includes("NotFoundException") || errorStr === "") {
                 setScanningStatus("Scanning...")
                 return
               }
@@ -841,8 +901,17 @@ export default function ProductSearchPage() {
               }, 1000) // Wait 1 second before resuming after error
             } catch (err: any) {
               // If error handling itself fails, just log and continue
+              // Use console.error for critical errors
+              const errMsg = err && typeof err === 'object' && 'message' in err 
+                ? String(err.message) 
+                : String(err || "Unknown error")
               console.error("Error in scanner error callback:", err)
-              addDebugLog(`❌ Error in error handler: ${err?.message || "Unknown"}`)
+              try {
+                addDebugLog(`❌ Error in error handler: ${errMsg}`)
+              } catch {
+                // If even addDebugLog fails, just use console
+                console.error("Failed to add debug log:", errMsg)
+              }
               setScanningStatus("Scanning...")
             }
           }
