@@ -450,15 +450,48 @@ export default function ProductSearchPage() {
     try {
       // Merge user-provided aspects with existing aspects
       const currentAspects = productData.localizedAspects || productData.aspects || {}
-      const mergedAspects = { ...currentAspects }
+      const mergedAspects: Record<string, string[]> = {}
       
-      // Add user-provided aspects
-      if (additionalAspects) {
-        Object.keys(additionalAspects).forEach(key => {
-          if (additionalAspects[key]) {
-            mergedAspects[key] = [additionalAspects[key]]
+      // First, copy existing aspects and ensure they're in array format
+      Object.keys(currentAspects).forEach(key => {
+        const value = currentAspects[key]
+        if (value) {
+          if (Array.isArray(value)) {
+            // Filter out empty values
+            const nonEmptyValues = value.filter(v => v && String(v).trim() !== "")
+            if (nonEmptyValues.length > 0) {
+              mergedAspects[key] = nonEmptyValues.map(v => String(v).trim())
+            }
+          } else if (String(value).trim() !== "") {
+            mergedAspects[key] = [String(value).trim()]
+          }
+        }
+      })
+      
+      // Add user-provided aspects (these will overwrite existing ones)
+      // Map user-provided aspect names to exact names from aspectDefinitions if available
+      if (additionalAspects && Object.keys(additionalAspects).length > 0) {
+        console.log("Merging user-provided aspects:", additionalAspects)
+        console.log("Available aspect definitions:", aspectDefinitions.map((a: any) => a.name))
+        
+        Object.keys(additionalAspects).forEach(userKey => {
+          const value = additionalAspects[userKey]
+          if (value && typeof value === 'string' && value.trim() !== "") {
+            // Use the exact aspect name from aspectDefinitions if available
+            // This ensures we match exactly what eBay expects
+            const aspectDef = aspectDefinitions.find((a: any) => 
+              a.name && a.name.toLowerCase() === userKey.toLowerCase()
+            )
+            const exactAspectName = aspectDef ? aspectDef.name : userKey
+            
+            // Ensure the value is stored as an array (eBay format)
+            // This overwrites any existing value for this aspect
+            mergedAspects[exactAspectName] = [value.trim()]
+            console.log(`Mapped aspect "${userKey}" -> "${exactAspectName}" with value:`, value.trim())
           }
         })
+        
+        console.log("Final merged aspects:", mergedAspects)
       }
       
       // Calculate discounted price for listing

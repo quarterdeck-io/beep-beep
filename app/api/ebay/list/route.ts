@@ -349,7 +349,13 @@ export async function POST(req: Request) {
         })
       } else {
         // Already in correct format: {Brand: ["Sony"], Model: ["PS5"]}
-        formattedAspects = aspects
+        // Normalize aspect keys to match eBay's expected format
+        formattedAspects = {}
+        Object.keys(aspects).forEach(key => {
+          const value = aspects[key]
+          // Ensure values are arrays
+          formattedAspects[key] = Array.isArray(value) ? value : [value]
+        })
       }
       
       // Ensure Brand is included (required for most categories)
@@ -412,25 +418,56 @@ export async function POST(req: Request) {
         })
         
         // Check if we have all required aspects
-        const currentAspectKeys = formattedAspects ? Object.keys(formattedAspects).map(k => k.toLowerCase()) : []
+        // Create a map of aspect names (case-insensitive) to their exact keys in formattedAspects
+        const aspectNameMap = new Map<string, string>()
+        if (formattedAspects) {
+          Object.keys(formattedAspects).forEach(key => {
+            aspectNameMap.set(key.toLowerCase(), key)
+          })
+        }
+        
+        console.log("Validating required aspects:", {
+          requiredAspects,
+          currentAspectKeys: formattedAspects ? Object.keys(formattedAspects) : [],
+          formattedAspects
+        })
+        
         const missingAspects: string[] = []
         
         requiredAspects.forEach((requiredAspect: string) => {
-          const aspectKey = requiredAspect.toLowerCase()
-          const hasAspect = currentAspectKeys.some(key => 
-            key === aspectKey || 
-            key.includes(aspectKey) || 
-            aspectKey.includes(key)
-          )
+          const aspectKeyLower = requiredAspect.toLowerCase()
+          const exactKey = aspectNameMap.get(aspectKeyLower)
           
-          if (!hasAspect) {
-            missingAspects.push(requiredAspect)
-          } else {
-            // Check if aspect has values
-            const aspectKeyMatch = Object.keys(formattedAspects || {}).find(k => k.toLowerCase() === aspectKey)
-            const aspectValues = aspectKeyMatch ? formattedAspects[aspectKeyMatch] : null
-            if (!aspectValues || (Array.isArray(aspectValues) && aspectValues.length === 0)) {
+          if (!exactKey) {
+            // Try fuzzy matching as fallback
+            const fuzzyMatch = Array.from(aspectNameMap.keys()).find(key => 
+              key === aspectKeyLower || 
+              key.includes(aspectKeyLower) || 
+              aspectKeyLower.includes(key)
+            )
+            
+            if (!fuzzyMatch) {
+              console.log(`Missing aspect: "${requiredAspect}" (no match found)`)
               missingAspects.push(requiredAspect)
+            } else {
+              // Found via fuzzy match, check if it has values
+              const matchedKey = aspectNameMap.get(fuzzyMatch)
+              const aspectValues = matchedKey ? formattedAspects[matchedKey] : null
+              if (!aspectValues || (Array.isArray(aspectValues) && aspectValues.length === 0)) {
+                console.log(`Missing aspect: "${requiredAspect}" (found key "${matchedKey}" but no values)`)
+                missingAspects.push(requiredAspect)
+              } else {
+                console.log(`Found aspect: "${requiredAspect}" via fuzzy match "${matchedKey}" with values:`, aspectValues)
+              }
+            }
+          } else {
+            // Found exact match, check if it has values
+            const aspectValues = formattedAspects[exactKey]
+            if (!aspectValues || (Array.isArray(aspectValues) && aspectValues.length === 0)) {
+              console.log(`Missing aspect: "${requiredAspect}" (found key "${exactKey}" but no values)`)
+              missingAspects.push(requiredAspect)
+            } else {
+              console.log(`Found aspect: "${requiredAspect}" with values:`, aspectValues)
             }
           }
         })
