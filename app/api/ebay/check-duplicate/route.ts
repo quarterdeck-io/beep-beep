@@ -90,19 +90,16 @@ export async function GET(req: Request) {
       ? "https://api.sandbox.ebay.com"
       : "https://api.ebay.com"
 
-    // Normalize UPC for comparison - preserve leading zeros for accurate matching
+    // Normalize UPC for comparison
     const normalizeUPC = (upcValue: string): string => {
       if (!upcValue) return ""
-      // Remove all non-digit characters but preserve leading zeros
       const digitsOnly = String(upcValue).replace(/\D/g, "")
       return digitsOnly
     }
     
-    // Also create a version without leading zeros for flexible matching
     const normalizeUPCNoLeadingZeros = (upcValue: string): string => {
       const normalized = normalizeUPC(upcValue)
       if (!normalized) return ""
-      // Remove leading zeros but keep at least one digit
       return normalized.replace(/^0+/, "") || normalized
     }
     
@@ -110,9 +107,8 @@ export async function GET(req: Request) {
     const normalizedSearchUPC = normalizeUPC(originalUpcTrimmed)
     const normalizedSearchUPCNoZeros = normalizeUPCNoLeadingZeros(originalUpcTrimmed)
 
-    // Get all inventory items from the user's eBay account
-    // eBay API supports limit and offset query parameters for pagination
-    const inventoryUrl = `${baseUrl}/sell/inventory/v1/inventory_item?limit=25&offset=0`
+    // ⚡ OPTIMIZATION 1: Use larger page size to reduce API calls
+    const inventoryUrl = `${baseUrl}/sell/inventory/v1/inventory_item?limit=200&offset=0`
     
     const inventoryResponse = await fetch(inventoryUrl, {
       headers: {
@@ -126,7 +122,6 @@ export async function GET(req: Request) {
 
     if (!inventoryResponse.ok) {
       const errorText = await inventoryResponse.text().catch(() => "Unknown error")
-      // If we can't check, return no duplicates (don't block the user)
       return NextResponse.json({
         hasDuplicates: false,
         duplicates: [],
@@ -140,50 +135,18 @@ export async function GET(req: Request) {
     let inventoryItems = inventoryData.inventoryItems || []
     let next = inventoryData.next
 
-    // Helper function to check if item has matching UPC
-    const hasMatchingUPC = async (item: any): Promise<{ match: boolean; sku?: string; title?: string }> => {
+    // ⚡ OPTIMIZATION 2: Check UPC without fetching individual items
+    const checkItemForUPC = (item: any): { match: boolean; sku?: string; title?: string } => {
       const sku = item.sku
-      
-      // Fetch full item details to get complete product information
-      let product = item.product
-      
-      try {
-        const itemUrl = `${baseUrl}/sell/inventory/v1/inventory_item/${sku}`
-        const itemResponse = await fetch(itemUrl, {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
-            'Content-Language': 'en-US',
-            'Accept-Language': 'en-US',
-            'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
-          },
-        })
-        
-        if (itemResponse.ok) {
-          const itemData = await itemResponse.json()
-          product = itemData.product
-        } else {
-          // Fall back to list data if available
-          if (!product) {
-            product = item.product
-          }
-        }
-      } catch (fetchError) {
-        // Fall back to list data if available
-        if (!product) {
-          product = item.product
-        }
-      }
+      const product = item.product
       
       if (!product) {
         return { match: false }
       }
       
-      // Helper to check if a value matches our search UPC
       const checkValueMatch = (value: any): boolean => {
         if (!value) return false
         
-        // Handle arrays
         if (Array.isArray(value)) {
           for (const val of value) {
             if (checkValueMatch(val)) return true
@@ -195,7 +158,6 @@ export async function GET(req: Request) {
         const normalizedValue = normalizeUPC(valueStr)
         const normalizedValueNoZeros = normalizeUPCNoLeadingZeros(valueStr)
         
-        // Try multiple comparison methods for maximum compatibility
         const exactMatch = valueStr === originalUpcTrimmed
         const normalizedMatch = normalizedValue === normalizedSearchUPC
         const normalizedMatchNoZeros = normalizedValueNoZeros === normalizedSearchUPCNoZeros
@@ -204,50 +166,30 @@ export async function GET(req: Request) {
         return exactMatch || normalizedMatch || normalizedMatchNoZeros || digitsOnlyMatch
       }
       
-      // Check product.upc array
-      if (product.upc) {
-        const upcMatch = checkValueMatch(product.upc)
-        if (upcMatch) {
-          return { match: true, sku, title: product.title || item.product?.title }
-        }
+      // Check all product identifier fields
+      if (product.upc && checkValueMatch(product.upc)) {
+        return { match: true, sku, title: product.title }
       }
       
-      // Check product.ean
-      if (product.ean) {
-        const eanMatch = checkValueMatch(product.ean)
-        if (eanMatch) {
-          return { match: true, sku, title: product.title || item.product?.title }
-        }
+      if (product.ean && checkValueMatch(product.ean)) {
+        return { match: true, sku, title: product.title }
       }
       
-      // Check product.isbn
-      if (product.isbn) {
-        const isbnMatch = checkValueMatch(product.isbn)
-        if (isbnMatch) {
-          return { match: true, sku, title: product.title || item.product?.title }
-        }
+      if (product.isbn && checkValueMatch(product.isbn)) {
+        return { match: true, sku, title: product.title }
       }
       
-      // Check product.gtin
-      if (product.gtin) {
-        const gtinMatch = checkValueMatch(product.gtin)
-        if (gtinMatch) {
-          return { match: true, sku, title: product.title || item.product?.title }
-        }
+      if (product.gtin && checkValueMatch(product.gtin)) {
+        return { match: true, sku, title: product.title }
       }
       
-      // Check productIdentifiers array
       const productIdentifiers = product.productIdentifiers || []
-      if (Array.isArray(productIdentifiers) && productIdentifiers.length > 0) {
+      if (Array.isArray(productIdentifiers)) {
         for (const identifier of productIdentifiers) {
-          if (identifier.type === "UPC" || identifier.type === "UPC_A" || identifier.type === "UPC_E" || 
-              identifier.type === "GTIN" || identifier.type === "EAN" || identifier.type === "ISBN") {
+          if (["UPC", "UPC_A", "UPC_E", "GTIN", "EAN", "ISBN"].includes(identifier.type)) {
             const identifierValue = identifier.value || identifier.identifier
-            if (identifierValue) {
-              const idMatch = checkValueMatch(identifierValue)
-              if (idMatch) {
-                return { match: true, sku, title: product.title || item.product?.title }
-              }
+            if (identifierValue && checkValueMatch(identifierValue)) {
+              return { match: true, sku, title: product.title }
             }
           }
         }
@@ -257,27 +199,37 @@ export async function GET(req: Request) {
     }
 
     const duplicates: Array<{ sku: string; title: string }> = []
+    const MAX_DUPLICATES = 10
+    const MAX_PAGES = 30 // ⚡ OPTIMIZATION 3: Limit total pages checked
 
     // Check first page
     for (const item of inventoryItems) {
-      const result = await hasMatchingUPC(item)
+      const result = checkItemForUPC(item)
       if (result.match && result.sku) {
         duplicates.push({
           sku: result.sku,
           title: result.title || "Unknown product"
         })
+        if (duplicates.length >= MAX_DUPLICATES) break
       }
     }
 
-    // If there are more pages, check them too
-    while (next && duplicates.length < 10) { // Limit to first 10 duplicates
-      // Handle relative URLs from eBay API - prepend base URL if needed
+    // ⚡ OPTIMIZATION 4: Early exit if duplicates found
+    if (duplicates.length >= MAX_DUPLICATES) {
+      return NextResponse.json({
+        hasDuplicates: true,
+        duplicates: duplicates,
+        upc: upc
+      })
+    }
+
+    // Check additional pages if needed
+    let pageCount = 1
+    while (next && duplicates.length < MAX_DUPLICATES && pageCount < MAX_PAGES) {
       let nextUrl = next
       if (next.startsWith('/')) {
-        // Relative URL, prepend base URL
         nextUrl = `${baseUrl}${next}`
       } else if (!next.startsWith('http://') && !next.startsWith('https://')) {
-        // Not a full URL, prepend base URL
         nextUrl = `${baseUrl}/${next}`
       }
       
@@ -298,16 +250,16 @@ export async function GET(req: Request) {
       const nextData = await nextResponse.json()
       inventoryItems = nextData.inventoryItems || []
       next = nextData.next
+      pageCount++
 
-      // Check this page
       for (const item of inventoryItems) {
-        const result = await hasMatchingUPC(item)
+        const result = checkItemForUPC(item)
         if (result.match && result.sku) {
           duplicates.push({
             sku: result.sku,
             title: result.title || "Unknown product"
           })
-          if (duplicates.length >= 10) break // Limit to first 10 duplicates
+          if (duplicates.length >= MAX_DUPLICATES) break
         }
       }
     }
@@ -327,7 +279,6 @@ export async function GET(req: Request) {
     })
 
   } catch (error) {
-    // On error, return no duplicates (don't block the user)
     return NextResponse.json({
       hasDuplicates: false,
       duplicates: [],
