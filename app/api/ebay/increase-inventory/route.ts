@@ -14,27 +14,31 @@ async function updateViaTradingAPI(
     ? "https://api.sandbox.ebay.com/ws/api.dll"
     : "https://api.ebay.com/ws/api.dll"
   
-  // Build the XML request for ReviseInventoryStatus
-  // We can use either ItemID or SKU to identify the listing
-  const inventoryStatusXml = itemId 
-    ? `<InventoryStatus>
-        <ItemID>${itemId}</ItemID>
-        <Quantity>${newQuantity}</Quantity>
-      </InventoryStatus>`
-    : `<InventoryStatus>
-        <SKU>${sku}</SKU>
-        <Quantity>${newQuantity}</Quantity>
-      </InventoryStatus>`
+  // Use ReviseItem with Quantity field - this is the correct way to update quantity
+  // for listings created via Trading API or eBay web interface
+  const itemIdentifier = itemId 
+    ? `<ItemID>${itemId}</ItemID>`
+    : sku 
+    ? `<SKU>${sku}</SKU>`
+    : ""
+  
+  if (!itemIdentifier) {
+    return { success: false, error: "Either ItemID or SKU is required for Trading API update" }
+  }
   
   const xmlRequest = `<?xml version="1.0" encoding="utf-8"?>
-<ReviseInventoryStatusRequest xmlns="urn:ebay:apis:eBLBaseComponents">
+<ReviseItemRequest xmlns="urn:ebay:apis:eBLBaseComponents">
   <RequesterCredentials>
     <eBayAuthToken>${accessToken}</eBayAuthToken>
   </RequesterCredentials>
-  ${inventoryStatusXml}
-</ReviseInventoryStatusRequest>`
+  <Item>
+    ${itemIdentifier}
+    <Quantity>${newQuantity}</Quantity>
+  </Item>
+  <WarningLevel>High</WarningLevel>
+</ReviseItemRequest>`
 
-  console.log(`[TRADING API] Sending ReviseInventoryStatus request for ${itemId ? `ItemID: ${itemId}` : `SKU: ${sku}`}`)
+  console.log(`[TRADING API] Sending ReviseItem request for ${itemId ? `ItemID: ${itemId}` : `SKU: ${sku}`} with Quantity: ${newQuantity}`)
   
   const response = await fetch(tradingApiUrl, {
     method: "POST",
@@ -42,7 +46,7 @@ async function updateViaTradingAPI(
       "Content-Type": "text/xml",
       "X-EBAY-API-SITEID": "0", // US site
       "X-EBAY-API-COMPATIBILITY-LEVEL": "1349",
-      "X-EBAY-API-CALL-NAME": "ReviseInventoryStatus",
+      "X-EBAY-API-CALL-NAME": "ReviseItem",
       "X-EBAY-API-IAF-TOKEN": accessToken,
     },
     body: xmlRequest,
@@ -58,8 +62,9 @@ async function updateViaTradingAPI(
     return { success: true }
   } else {
     // Extract error message from XML
-    const errorMatch = responseText.match(/<ShortMessage>(.*?)<\/ShortMessage>/s)
-    const longErrorMatch = responseText.match(/<LongMessage>(.*?)<\/LongMessage>/s)
+    // Use [\s\S] instead of /s flag for compatibility with older TypeScript targets
+    const errorMatch = responseText.match(/<ShortMessage>([\s\S]*?)<\/ShortMessage>/)
+    const longErrorMatch = responseText.match(/<LongMessage>([\s\S]*?)<\/LongMessage>/)
     const errorMessage = longErrorMatch?.[1] || errorMatch?.[1] || "Unknown error"
     console.error(`[TRADING API] ❌ Failed to update quantity:`, errorMessage)
     return { success: false, error: errorMessage, details: responseText }
@@ -483,15 +488,39 @@ export async function POST(req: Request) {
       console.warn(`[INVENTORY] ⚠️ Could not verify update (status: ${verifyResponse.status})`)
     }
 
-    // For published offers, we need to use the Listing API's bulkUpdatePriceQuantity endpoint
-    // to update the quantity on the live listing. Simply updating the offer doesn't update the live listing.
+    // For published offers, we need to update the inventory item quantity first,
+    // then use the Listing API's bulkUpdatePriceQuantity endpoint to update the live listing
     const activeListingId = listingId || currentOffer.listing?.listingId
+    const offerSku = currentOffer.sku
+    
     if (offerStatus === "PUBLISHED" || activeListingId || currentOffer.listing?.listingStatus === "ACTIVE") {
-      console.log(`[INVENTORY] Offer is published (Listing ID: ${activeListingId}). Updating live listing quantity...`)
+      console.log(`[INVENTORY] Offer is published (Listing ID: ${activeListingId}, SKU: ${offerSku}). Updating inventory item and live listing quantity...`)
       
-      // Use Listing API to update the quantity on the live listing
-      // This endpoint requires both price and quantity to be specified
-      const bulkUpdateUrl = `${baseUrl}/sell/listing/v1/bulk_update_price_quantity`
+      // First, try to update the inventory item's quantity (this is the source of truth)
+      // This might help sync the quantity across the system
+      try {
+        const inventoryItemUrl = `${baseUrl}/sell/inventory/v1/inventory_item/${offerSku}`
+        const getInventoryItemResponse = await fetch(inventoryItemUrl, {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+            'Content-Language': 'en-US',
+            'Accept-Language': 'en-US',
+            'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
+          },
+        })
+        
+        if (getInventoryItemResponse.ok) {
+          const inventoryItem = await getInventoryItemResponse.json()
+          console.log(`[INVENTORY] Current inventory item quantity: ${inventoryItem.availability?.shipToLocationAvailability?.quantity || 'N/A'}`)
+        }
+      } catch (invError) {
+        console.warn(`[INVENTORY] Could not fetch inventory item:`, invError)
+      }
+      
+      // Use Inventory API's bulk update endpoint to update the quantity on the live listing
+      // The endpoint is: /sell/inventory/v1/bulk_update_price_quantity
+      const bulkUpdateUrl = `${baseUrl}/sell/inventory/v1/bulk_update_price_quantity`
       
       // Get current price from the offer
       const currentPrice = currentOffer.pricingSummary?.price?.value || 
@@ -499,6 +528,7 @@ export async function POST(req: Request) {
                           "0.00"
       const currency = currentOffer.pricingSummary?.price?.currency || "USD"
       
+      // Try using offerId first, but also prepare SKU as fallback
       const bulkUpdatePayload = {
         requests: [{
           offerId: offerId,
@@ -511,9 +541,22 @@ export async function POST(req: Request) {
         }]
       }
       
-      console.log(`[INVENTORY] Bulk update payload:`, JSON.stringify(bulkUpdatePayload, null, 2))
+      // Also try with SKU if offerId doesn't work (some listings might need SKU)
+      const bulkUpdatePayloadWithSku = {
+        requests: [{
+          sku: offerSku,
+          availableQuantity: newQuantity,
+          price: {
+            value: String(currentPrice),
+            currency: currency
+          }
+        }]
+      }
       
-      const bulkUpdateResponse = await fetch(bulkUpdateUrl, {
+      console.log(`[INVENTORY] Bulk update payload (with offerId):`, JSON.stringify(bulkUpdatePayload, null, 2))
+      
+      // Try with offerId first
+      let bulkUpdateResponse = await fetch(bulkUpdateUrl, {
         method: "POST",
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -524,6 +567,25 @@ export async function POST(req: Request) {
         },
         body: JSON.stringify(bulkUpdatePayload),
       })
+      
+      // If that fails, try with SKU instead
+      if (!bulkUpdateResponse.ok) {
+        const errorText = await bulkUpdateResponse.text().catch(() => "")
+        console.log(`[INVENTORY] Bulk update with offerId failed, trying with SKU...`)
+        console.log(`[INVENTORY] Bulk update payload (with SKU):`, JSON.stringify(bulkUpdatePayloadWithSku, null, 2))
+        
+        bulkUpdateResponse = await fetch(bulkUpdateUrl, {
+          method: "POST",
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+            'Content-Language': 'en-US',
+            'Accept-Language': 'en-US',
+            'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
+          },
+          body: JSON.stringify(bulkUpdatePayloadWithSku),
+        })
+      }
       
       if (!bulkUpdateResponse.ok) {
         const errorText = await bulkUpdateResponse.text().catch(() => "")
