@@ -2,6 +2,70 @@ import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 
+// Helper function to update quantity via Trading API (for listings not created via Inventory API)
+async function updateViaTradingAPI(
+  accessToken: string,
+  itemId: string,
+  sku: string | null,
+  newQuantity: number,
+  isSandbox: boolean
+): Promise<{ success: boolean; error?: string; details?: any }> {
+  const tradingApiUrl = isSandbox
+    ? "https://api.sandbox.ebay.com/ws/api.dll"
+    : "https://api.ebay.com/ws/api.dll"
+  
+  // Build the XML request for ReviseInventoryStatus
+  // We can use either ItemID or SKU to identify the listing
+  const inventoryStatusXml = itemId 
+    ? `<InventoryStatus>
+        <ItemID>${itemId}</ItemID>
+        <Quantity>${newQuantity}</Quantity>
+      </InventoryStatus>`
+    : `<InventoryStatus>
+        <SKU>${sku}</SKU>
+        <Quantity>${newQuantity}</Quantity>
+      </InventoryStatus>`
+  
+  const xmlRequest = `<?xml version="1.0" encoding="utf-8"?>
+<ReviseInventoryStatusRequest xmlns="urn:ebay:apis:eBLBaseComponents">
+  <RequesterCredentials>
+    <eBayAuthToken>${accessToken}</eBayAuthToken>
+  </RequesterCredentials>
+  ${inventoryStatusXml}
+</ReviseInventoryStatusRequest>`
+
+  console.log(`[TRADING API] Sending ReviseInventoryStatus request for ${itemId ? `ItemID: ${itemId}` : `SKU: ${sku}`}`)
+  
+  const response = await fetch(tradingApiUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "text/xml",
+      "X-EBAY-API-SITEID": "0", // US site
+      "X-EBAY-API-COMPATIBILITY-LEVEL": "1349",
+      "X-EBAY-API-CALL-NAME": "ReviseInventoryStatus",
+      "X-EBAY-API-IAF-TOKEN": accessToken,
+    },
+    body: xmlRequest,
+  })
+
+  const responseText = await response.text()
+  console.log(`[TRADING API] Response status: ${response.status}`)
+  console.log(`[TRADING API] Response body:`, responseText.substring(0, 1000))
+
+  // Parse XML response to check for success/failure
+  if (responseText.includes("<Ack>Success</Ack>") || responseText.includes("<Ack>Warning</Ack>")) {
+    console.log(`[TRADING API] ✅ Successfully updated quantity to ${newQuantity}`)
+    return { success: true }
+  } else {
+    // Extract error message from XML
+    const errorMatch = responseText.match(/<ShortMessage>(.*?)<\/ShortMessage>/s)
+    const longErrorMatch = responseText.match(/<LongMessage>(.*?)<\/LongMessage>/s)
+    const errorMessage = longErrorMatch?.[1] || errorMatch?.[1] || "Unknown error"
+    console.error(`[TRADING API] ❌ Failed to update quantity:`, errorMessage)
+    return { success: false, error: errorMessage, details: responseText }
+  }
+}
+
 export async function POST(req: Request) {
   try {
     const session = await auth()
@@ -463,15 +527,58 @@ export async function POST(req: Request) {
       
       if (!bulkUpdateResponse.ok) {
         const errorText = await bulkUpdateResponse.text().catch(() => "")
-        let errorData = {}
+        let errorData: any = {}
         try {
           errorData = JSON.parse(errorText)
         } catch {
           errorData = { message: errorText }
         }
-        console.error(`[INVENTORY] Failed to update live listing quantity:`, bulkUpdateResponse.status, errorData)
+        console.error(`[INVENTORY] Failed to update live listing quantity via Inventory API:`, bulkUpdateResponse.status, errorData)
         
-        // If bulk update fails, still return success for the offer update
+        // Check if this is an "Inventory API not supported" error
+        // This happens when the listing was created via Trading API or eBay Seller Hub
+        const isInventoryApiNotSupported = 
+          errorText.includes("not currently supported") ||
+          errorText.includes("not supported") ||
+          errorData?.errors?.some((e: any) => 
+            e.message?.includes("not supported") || 
+            e.errorId === 25710 || // Inventory-based listing management not supported
+            e.errorId === 25002   // Invalid listing
+          )
+        
+        if (isInventoryApiNotSupported && activeListingId) {
+          console.log(`[INVENTORY] Inventory API not supported for this listing. Trying Trading API...`)
+          
+          // Fall back to Trading API's ReviseInventoryStatus
+          const tradingResult = await updateViaTradingAPI(
+            accessToken,
+            activeListingId,
+            sku || currentOffer.sku,
+            newQuantity,
+            isSandbox
+          )
+          
+          if (tradingResult.success) {
+            return NextResponse.json({
+              success: true,
+              newQuantity: newQuantity,
+              message: `Inventory increased successfully! Quantity updated to ${newQuantity} on your eBay listing (via Trading API).`,
+              listingId: activeListingId,
+              method: "trading_api"
+            })
+          } else {
+            // Trading API also failed
+            return NextResponse.json({
+              success: false,
+              error: `Failed to update quantity. This listing may have restrictions. Error: ${tradingResult.error}`,
+              listingId: activeListingId,
+              inventoryApiError: errorData,
+              tradingApiError: tradingResult.details
+            }, { status: 400 })
+          }
+        }
+        
+        // If bulk update fails for other reasons, still return success for the offer update
         // but warn the user that the live listing might not be updated
         return NextResponse.json({
           success: true,
@@ -483,6 +590,52 @@ export async function POST(req: Request) {
       }
       
       const bulkUpdateResult = await bulkUpdateResponse.json().catch(() => ({}))
+      
+      // Check if the bulk update response contains errors for any of the items
+      const responses = bulkUpdateResult.responses || []
+      const hasErrors = responses.some((r: any) => r.errors && r.errors.length > 0)
+      
+      if (hasErrors) {
+        const errors = responses.flatMap((r: any) => r.errors || [])
+        console.error(`[INVENTORY] Bulk update returned errors:`, errors)
+        
+        // Check if this is an "Inventory API not supported" error
+        const isInventoryApiNotSupported = errors.some((e: any) => 
+          e.message?.includes("not supported") || 
+          e.errorId === 25710 ||
+          e.errorId === 25002
+        )
+        
+        if (isInventoryApiNotSupported && activeListingId) {
+          console.log(`[INVENTORY] Inventory API not supported (from response). Trying Trading API...`)
+          
+          const tradingResult = await updateViaTradingAPI(
+            accessToken,
+            activeListingId,
+            sku || currentOffer.sku,
+            newQuantity,
+            isSandbox
+          )
+          
+          if (tradingResult.success) {
+            return NextResponse.json({
+              success: true,
+              newQuantity: newQuantity,
+              message: `Inventory increased successfully! Quantity updated to ${newQuantity} on your eBay listing (via Trading API).`,
+              listingId: activeListingId,
+              method: "trading_api"
+            })
+          }
+        }
+        
+        return NextResponse.json({
+          success: false,
+          error: `Failed to update live listing quantity: ${errors[0]?.message || 'Unknown error'}`,
+          listingId: activeListingId || null,
+          details: errors
+        }, { status: 400 })
+      }
+      
       console.log(`[INVENTORY] ✅ Live listing quantity updated successfully:`, bulkUpdateResult)
       
       return NextResponse.json({
