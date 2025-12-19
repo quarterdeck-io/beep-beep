@@ -488,24 +488,115 @@ export async function POST(req: Request) {
       console.warn(`[INVENTORY] ⚠️ Could not verify update (status: ${verifyResponse.status})`)
     }
 
-    // For published offers, we need to update the live listing quantity
-    // Since the offer update is successful, we'll try to update the live listing
+    // For published offers, we need to update the inventory item's availability
+    // This is the source of truth and should sync to both offer and listing
     const activeListingId = listingId || currentOffer.listing?.listingId
     const offerSku = currentOffer.sku
     
     if (offerStatus === "PUBLISHED" || activeListingId || currentOffer.listing?.listingStatus === "ACTIVE") {
-      console.log(`[INVENTORY] Offer is published (Listing ID: ${activeListingId}, SKU: ${offerSku}). Updating live listing quantity...`)
+      console.log(`[INVENTORY] Offer is published (Listing ID: ${activeListingId}, SKU: ${offerSku}). Updating inventory item availability...`)
       
-      // For Inventory API listings, updating the offer should sync to the listing
-      // But if we have a listing ID, we can also try Trading API's ReviseItem as a direct update
-      // This is more reliable than the bulk update endpoint which seems to have issues
+      // KEY INSIGHT: For Inventory API listings, we need to update the inventory item's
+      // shipToLocationAvailability.quantity, which is the source of truth.
+      // This should sync to both the offer and the live listing.
+      try {
+        const inventoryItemUrl = `${baseUrl}/sell/inventory/v1/inventory_item/${offerSku}`
+        
+        // First, get the current inventory item to preserve all fields
+        const getInventoryItemResponse = await fetch(inventoryItemUrl, {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+            'Content-Language': 'en-US',
+            'Accept-Language': 'en-US',
+            'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
+          },
+        })
+        
+        if (getInventoryItemResponse.ok) {
+          const inventoryItem = await getInventoryItemResponse.json()
+          console.log(`[INVENTORY] Current inventory item quantity: ${inventoryItem.availability?.shipToLocationAvailability?.quantity || 'N/A'}`)
+          
+          // Update the inventory item with new quantity
+          const updatedInventoryItem = {
+            ...inventoryItem,
+            availability: {
+              ...inventoryItem.availability,
+              shipToLocationAvailability: {
+                ...inventoryItem.availability?.shipToLocationAvailability,
+                quantity: newQuantity
+              }
+            }
+          }
+          
+          console.log(`[INVENTORY] Updating inventory item availability to quantity: ${newQuantity}`)
+          
+          const updateInventoryItemResponse = await fetch(inventoryItemUrl, {
+            method: "PUT",
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+              'Content-Language': 'en-US',
+              'Accept-Language': 'en-US',
+              'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
+            },
+            body: JSON.stringify(updatedInventoryItem),
+          })
+          
+          if (updateInventoryItemResponse.ok) {
+            console.log(`[INVENTORY] ✅ Inventory item availability updated successfully (status: ${updateInventoryItemResponse.status})`)
+            
+            // Verify the update
+            const verifyInventoryResponse = await fetch(inventoryItemUrl, {
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+                'Content-Language': 'en-US',
+                'Accept-Language': 'en-US',
+                'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
+              },
+            })
+            
+            if (verifyInventoryResponse.ok) {
+              const verifiedItem = await verifyInventoryResponse.json()
+              const verifiedQty = verifiedItem.availability?.shipToLocationAvailability?.quantity
+              console.log(`[INVENTORY] Verified inventory item quantity: ${verifiedQty}`)
+              
+              if (verifiedQty === newQuantity) {
+                // Success! The inventory item is updated, which should sync to the listing
+                return NextResponse.json({
+                  success: true,
+                  newQuantity: newQuantity,
+                  message: `Inventory increased successfully! Quantity updated to ${newQuantity}. Changes should appear on your eBay listing within 1-2 minutes.`,
+                  listingId: activeListingId || null,
+                  method: "inventory_item_update"
+                })
+              }
+            }
+          } else {
+            const errorText = await updateInventoryItemResponse.text().catch(() => "")
+            let errorData: any = {}
+            try {
+              errorData = JSON.parse(errorText)
+            } catch {
+              errorData = { message: errorText }
+            }
+            console.error(`[INVENTORY] Failed to update inventory item:`, updateInventoryItemResponse.status, errorData)
+          }
+        } else {
+          console.warn(`[INVENTORY] Could not fetch inventory item for update (status: ${getInventoryItemResponse.status})`)
+        }
+      } catch (invError) {
+        console.error(`[INVENTORY] Error updating inventory item:`, invError)
+      }
       
-      // Try Trading API first if we have a listing ID (ItemID) - this is more direct
+      // Fallback: Try Trading API if inventory item update didn't work
+      // (though it will likely fail for Inventory API listings)
       if (activeListingId) {
-        console.log(`[INVENTORY] Attempting direct update via Trading API with Listing ID (ItemID): ${activeListingId}`)
+        console.log(`[INVENTORY] Attempting fallback update via Trading API with Listing ID (ItemID): ${activeListingId}`)
         const tradingResult = await updateViaTradingAPI(
           accessToken,
-          activeListingId, // This is the ItemID (listing ID) from eBay
+          activeListingId,
           sku || currentOffer.sku,
           newQuantity,
           isSandbox
@@ -520,7 +611,7 @@ export async function POST(req: Request) {
             method: "trading_api"
           })
         } else {
-          console.log(`[INVENTORY] Trading API update failed: ${tradingResult.error}. Offer was still updated successfully.`)
+          console.log(`[INVENTORY] Trading API update also failed: ${tradingResult.error}`)
         }
       }
       
