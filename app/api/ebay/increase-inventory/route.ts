@@ -488,37 +488,43 @@ export async function POST(req: Request) {
       console.warn(`[INVENTORY] ⚠️ Could not verify update (status: ${verifyResponse.status})`)
     }
 
-    // For published offers, we need to update the inventory item quantity first,
-    // then use the Listing API's bulkUpdatePriceQuantity endpoint to update the live listing
+    // For published offers, we need to update the live listing quantity
+    // Since the offer update is successful, we'll try to update the live listing
     const activeListingId = listingId || currentOffer.listing?.listingId
     const offerSku = currentOffer.sku
     
     if (offerStatus === "PUBLISHED" || activeListingId || currentOffer.listing?.listingStatus === "ACTIVE") {
-      console.log(`[INVENTORY] Offer is published (Listing ID: ${activeListingId}, SKU: ${offerSku}). Updating inventory item and live listing quantity...`)
+      console.log(`[INVENTORY] Offer is published (Listing ID: ${activeListingId}, SKU: ${offerSku}). Updating live listing quantity...`)
       
-      // First, try to update the inventory item's quantity (this is the source of truth)
-      // This might help sync the quantity across the system
-      try {
-        const inventoryItemUrl = `${baseUrl}/sell/inventory/v1/inventory_item/${offerSku}`
-        const getInventoryItemResponse = await fetch(inventoryItemUrl, {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
-            'Content-Language': 'en-US',
-            'Accept-Language': 'en-US',
-            'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
-          },
-        })
+      // For Inventory API listings, updating the offer should sync to the listing
+      // But if we have a listing ID, we can also try Trading API's ReviseItem as a direct update
+      // This is more reliable than the bulk update endpoint which seems to have issues
+      
+      // Try Trading API first if we have a listing ID (ItemID) - this is more direct
+      if (activeListingId) {
+        console.log(`[INVENTORY] Attempting direct update via Trading API with Listing ID (ItemID): ${activeListingId}`)
+        const tradingResult = await updateViaTradingAPI(
+          accessToken,
+          activeListingId, // This is the ItemID (listing ID) from eBay
+          sku || currentOffer.sku,
+          newQuantity,
+          isSandbox
+        )
         
-        if (getInventoryItemResponse.ok) {
-          const inventoryItem = await getInventoryItemResponse.json()
-          console.log(`[INVENTORY] Current inventory item quantity: ${inventoryItem.availability?.shipToLocationAvailability?.quantity || 'N/A'}`)
+        if (tradingResult.success) {
+          return NextResponse.json({
+            success: true,
+            newQuantity: newQuantity,
+            message: `Inventory increased successfully! Quantity updated to ${newQuantity} on your eBay listing.`,
+            listingId: activeListingId,
+            method: "trading_api"
+          })
+        } else {
+          console.log(`[INVENTORY] Trading API update failed: ${tradingResult.error}. Offer was still updated successfully.`)
         }
-      } catch (invError) {
-        console.warn(`[INVENTORY] Could not fetch inventory item:`, invError)
       }
       
-      // Use Inventory API's bulk update endpoint to update the quantity on the live listing
+      // Fallback: Try Inventory API's bulk update endpoint (though it often fails)
       // The endpoint is: /sell/inventory/v1/bulk_update_price_quantity
       const bulkUpdateUrl = `${baseUrl}/sell/inventory/v1/bulk_update_price_quantity`
       
@@ -597,8 +603,21 @@ export async function POST(req: Request) {
         }
         console.error(`[INVENTORY] Failed to update live listing quantity via Inventory API:`, bulkUpdateResponse.status, errorData)
         
-        // Check if this is an "Inventory API not supported" error
+        // Log detailed error information
+        if (errorData.responses && errorData.responses.length > 0) {
+          errorData.responses.forEach((resp: any, idx: number) => {
+            console.error(`[INVENTORY] Response ${idx} errors:`, JSON.stringify(resp.errors || [], null, 2))
+            if (resp.errors && resp.errors.length > 0) {
+              resp.errors.forEach((err: any) => {
+                console.error(`[INVENTORY] Error ${err.errorId || 'unknown'}: ${err.message || err.longMessage || 'Unknown error'}`)
+              })
+            }
+          })
+        }
+        
+        // Check if this is an "Inventory API not supported" error or any 400 error
         // This happens when the listing was created via Trading API or eBay Seller Hub
+        // OR when the bulk update endpoint doesn't work for this listing type
         const isInventoryApiNotSupported = 
           errorText.includes("not currently supported") ||
           errorText.includes("not supported") ||
@@ -608,13 +627,15 @@ export async function POST(req: Request) {
             e.errorId === 25002   // Invalid listing
           )
         
-        if (isInventoryApiNotSupported && activeListingId) {
-          console.log(`[INVENTORY] Inventory API not supported for this listing. Trying Trading API...`)
+        // If bulk update fails (400 error) OR inventory API not supported, try Trading API
+        // The listing ID (ItemID) should work with Trading API's ReviseItem
+        if ((isInventoryApiNotSupported || bulkUpdateResponse.status === 400) && activeListingId) {
+          console.log(`[INVENTORY] Bulk update failed or not supported. Trying Trading API with Listing ID (ItemID): ${activeListingId}...`)
           
-          // Fall back to Trading API's ReviseInventoryStatus
+          // Use Trading API's ReviseItem with the actual listing ID (ItemID)
           const tradingResult = await updateViaTradingAPI(
             accessToken,
-            activeListingId,
+            activeListingId, // This is the ItemID (listing ID) from eBay
             sku || currentOffer.sku,
             newQuantity,
             isSandbox
