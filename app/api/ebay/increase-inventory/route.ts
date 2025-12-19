@@ -419,20 +419,78 @@ export async function POST(req: Request) {
       console.warn(`[INVENTORY] ⚠️ Could not verify update (status: ${verifyResponse.status})`)
     }
 
-    // For published offers, eBay automatically syncs changes to the live listing
-    // We should NOT republish - eBay warns against it (error 25402)
-    // Changes should appear on the live listing within 1-2 minutes
+    // For published offers, we need to use the Listing API's bulkUpdatePriceQuantity endpoint
+    // to update the quantity on the live listing. Simply updating the offer doesn't update the live listing.
     const activeListingId = listingId || currentOffer.listing?.listingId
     if (offerStatus === "PUBLISHED" || activeListingId || currentOffer.listing?.listingStatus === "ACTIVE") {
-      console.log(`[INVENTORY] Offer is already published (Listing ID: ${activeListingId}). Changes will sync automatically.`)
-      console.log(`[INVENTORY] ⏳ Note: It may take 1-2 minutes for changes to appear on eBay listing.`)
+      console.log(`[INVENTORY] Offer is published (Listing ID: ${activeListingId}). Updating live listing quantity...`)
+      
+      // Use Listing API to update the quantity on the live listing
+      // This endpoint requires both price and quantity to be specified
+      const bulkUpdateUrl = `${baseUrl}/sell/listing/v1/bulk_update_price_quantity`
+      
+      // Get current price from the offer
+      const currentPrice = currentOffer.pricingSummary?.price?.value || 
+                          currentOffer.pricingSummary?.price || 
+                          "0.00"
+      const currency = currentOffer.pricingSummary?.price?.currency || "USD"
+      
+      const bulkUpdatePayload = {
+        requests: [{
+          offerId: offerId,
+          availableQuantity: newQuantity,
+          // Price is required - keep the same price, only update quantity
+          price: {
+            value: String(currentPrice),
+            currency: currency
+          }
+        }]
+      }
+      
+      console.log(`[INVENTORY] Bulk update payload:`, JSON.stringify(bulkUpdatePayload, null, 2))
+      
+      const bulkUpdateResponse = await fetch(bulkUpdateUrl, {
+        method: "POST",
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+          'Content-Language': 'en-US',
+          'Accept-Language': 'en-US',
+          'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
+        },
+        body: JSON.stringify(bulkUpdatePayload),
+      })
+      
+      if (!bulkUpdateResponse.ok) {
+        const errorText = await bulkUpdateResponse.text().catch(() => "")
+        let errorData = {}
+        try {
+          errorData = JSON.parse(errorText)
+        } catch {
+          errorData = { message: errorText }
+        }
+        console.error(`[INVENTORY] Failed to update live listing quantity:`, bulkUpdateResponse.status, errorData)
+        
+        // If bulk update fails, still return success for the offer update
+        // but warn the user that the live listing might not be updated
+        return NextResponse.json({
+          success: true,
+          newQuantity: newQuantity,
+          warning: `Offer quantity updated to ${newQuantity}, but failed to update live listing. Error: ${bulkUpdateResponse.status}`,
+          listingId: activeListingId || null,
+          details: errorData
+        })
+      }
+      
+      const bulkUpdateResult = await bulkUpdateResponse.json().catch(() => ({}))
+      console.log(`[INVENTORY] ✅ Live listing quantity updated successfully:`, bulkUpdateResult)
       
       return NextResponse.json({
         success: true,
         newQuantity: newQuantity,
-        message: `Inventory increased successfully! Quantity updated from ${currentQuantity} to ${newQuantity}. Changes will appear on your eBay listing within 1-2 minutes.`,
+        message: `Inventory increased successfully! Quantity updated from ${currentQuantity} to ${newQuantity} on your eBay listing.`,
         listingId: activeListingId || null,
-        note: "Offer is already published - changes sync automatically to live listing"
+        bulkUpdateResult: bulkUpdateResult
       })
     }
 
