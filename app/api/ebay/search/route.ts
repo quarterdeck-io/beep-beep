@@ -34,12 +34,11 @@ function getHighResImageUrl(imageUrl: string | undefined): { url: string; isHigh
   }
   
   // If image is 500px or larger, it meets eBay's minimum requirement
-  // Try to get a larger version for better quality (1200px)
+  // Use it as-is - don't try to convert URLs as the converted URLs might not exist
+  // eBay will check actual image dimensions, not just the URL
   if (currentSize >= 500) {
-    // Try to get 1200px version (more likely to exist than 1600px)
-    const highResUrl = imageUrl.replace(/\/s-l\d+\.jpg/i, '/s-l1200.jpg')
-    console.log(`[IMAGE RESIZE] Converting ${currentSize}px -> 1200px: ${imageUrl} -> ${highResUrl}`)
-    return { url: highResUrl, isHighRes: true }
+    console.log(`[IMAGE RESIZE] Image already ${currentSize}px (>= 500px, meets eBay requirement), using as-is: ${imageUrl}`)
+    return { url: imageUrl, isHighRes: true }
   }
   
   // If image is smaller than 500px, it doesn't meet eBay's requirement
