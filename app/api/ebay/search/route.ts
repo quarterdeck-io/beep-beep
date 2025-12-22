@@ -161,13 +161,72 @@ export async function GET(req: Request) {
     const selectedProduct = data.itemSummaries[randomIndex]
     
     // Use the random product but replace its price with the mean price
-    const product = {
+    let product: any = {
       ...selectedProduct,
       price: {
         ...selectedProduct.price,
         value: meanPrice,
         currency: selectedProduct.price?.currency || "USD"
       }
+    }
+
+    // Try to enrich with eBay catalog (stock) images.
+    // If this fails for any reason, we silently fall back to the existing
+    // Browse API images (seller images), preserving legacy behaviour.
+    try {
+      const isSandbox = process.env.EBAY_SANDBOX === "true"
+      const catalogApiUrl = isSandbox
+        ? "https://api.sandbox.ebay.com/commerce/catalog/v1_beta/product_summary/search"
+        : "https://api.ebay.com/commerce/catalog/v1_beta/product_summary/search"
+
+      const catalogResponse = await fetch(
+        `${catalogApiUrl}?q=${encodeURIComponent(upc)}&fieldgroups=PRODUCT`,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+            "X-EBAY-C-MARKETPLACE-ID": "EBAY_US",
+          },
+        }
+      )
+
+      if (catalogResponse.ok) {
+        const catalogData = await catalogResponse.json().catch(() => ({} as any))
+        const productSummaries = (catalogData as any).productSummaries
+
+        if (Array.isArray(productSummaries) && productSummaries.length > 0) {
+          const catalogProduct = productSummaries[0] as any
+          const stockImage = catalogProduct.image
+          const stockAdditionalImages = catalogProduct.additionalImages
+
+          if (stockImage?.imageUrl) {
+            // Preserve original seller images for reference/debugging.
+            const originalSellerImage = product.image
+            const originalSellerAdditionalImages = product.additionalImages
+
+            // Prefer stock image for primary display and listing.
+            product.image = stockImage
+            product.additionalImages =
+              Array.isArray(stockAdditionalImages) && stockAdditionalImages.length > 0
+                ? stockAdditionalImages
+                : originalSellerAdditionalImages
+
+            // Attach metadata so the frontend/debug view can see both sources.
+            product._imageSources = {
+              stockImage,
+              stockAdditionalImages: stockAdditionalImages || [],
+              sellerImage: originalSellerImage,
+              sellerAdditionalImages: originalSellerAdditionalImages || [],
+              source: "stock_preferred_with_seller_fallback",
+            }
+          }
+        }
+      }
+      // If catalogResponse is not ok or parsing fails, we intentionally do nothing
+      // and fall back to the Browse API images that are already in `product`.
+    } catch {
+      // Swallow all errors to avoid breaking legacy behaviour.
+      // The existing seller image paths remain untouched.
     }
     
     // Add metadata about the search for debugging
