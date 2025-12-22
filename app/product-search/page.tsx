@@ -1587,12 +1587,34 @@ export default function ProductSearchPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Product Image */}
                   {productData.image?.imageUrl && (
-                    <div>
+                    <div className="relative">
                       <img
                         src={productData.image.imageUrl}
                         alt={productData.title || "Product"}
                         className="w-full h-auto rounded-lg shadow"
+                        data-image-source={productData._imageSources?.source || "unknown"}
+                        data-stock-image-url={productData._imageSources?.stockImage?.imageUrl || ""}
+                        data-seller-image-url={productData._imageSources?.sellerImage?.imageUrl || ""}
+                        title={`Image Source: ${productData._imageSources?.source === "stock_preferred_with_seller_fallback" ? "Stock Image (from eBay Catalog)" : productData._imageSources?.source === "seller_only" ? "Seller Image (from Browse API)" : productData._imageSources?.source === "seller_only_fallback_due_to_size" ? "Seller Image (fallback - stock image too small)" : "Unknown"}`}
                       />
+                      {/* Image Source Badge */}
+                      {productData._imageSources?.source && (
+                        <div className={`absolute top-2 right-2 px-2 py-1 rounded text-xs font-semibold ${
+                          productData._imageSources.source === "stock_preferred_with_seller_fallback"
+                            ? "bg-green-500 text-white"
+                            : productData._imageSources.source === "seller_only" || productData._imageSources.source === "seller_only_fallback_due_to_size"
+                            ? "bg-blue-500 text-white"
+                            : "bg-gray-500 text-white"
+                        }`}>
+                          {productData._imageSources.source === "stock_preferred_with_seller_fallback"
+                            ? "📦 Stock"
+                            : productData._imageSources.source === "seller_only"
+                            ? "👤 Seller"
+                            : productData._imageSources.source === "seller_only_fallback_due_to_size"
+                            ? "👤 Seller (Fallback)"
+                            : "❓ Unknown"}
+                        </div>
+                      )}
                     </div>
                   )}
 
