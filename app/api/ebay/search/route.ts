@@ -173,11 +173,23 @@ export async function GET(req: Request) {
     // Try to enrich with eBay catalog (stock) images.
     // If this fails for any reason, we silently fall back to the existing
     // Browse API images (seller images), preserving legacy behaviour.
+    
+    // Preserve original seller images for reference/debugging
+    const originalSellerImage = product.image
+    const originalSellerAdditionalImages = product.additionalImages || []
+    
+    console.log(`[IMAGE FETCH] UPC: ${upc} - Starting image fetch process`)
+    console.log(`[IMAGE FETCH] Seller image from Browse API:`, originalSellerImage?.imageUrl || "None")
+    console.log(`[IMAGE FETCH] Seller additional images:`, originalSellerAdditionalImages.length)
+    
     try {
       const isSandbox = process.env.EBAY_SANDBOX === "true"
       const catalogApiUrl = isSandbox
         ? "https://api.sandbox.ebay.com/commerce/catalog/v1_beta/product_summary/search"
         : "https://api.ebay.com/commerce/catalog/v1_beta/product_summary/search"
+
+      console.log(`[IMAGE FETCH] Attempting to fetch stock image from Catalog API...`)
+      console.log(`[IMAGE FETCH] Catalog API URL: ${catalogApiUrl}`)
 
       const catalogResponse = await fetch(
         `${catalogApiUrl}?q=${encodeURIComponent(upc)}&fieldgroups=PRODUCT`,
@@ -190,20 +202,23 @@ export async function GET(req: Request) {
         }
       )
 
+      console.log(`[IMAGE FETCH] Catalog API response status: ${catalogResponse.status} ${catalogResponse.statusText}`)
+
       if (catalogResponse.ok) {
         const catalogData = await catalogResponse.json().catch(() => ({} as any))
         const productSummaries = (catalogData as any).productSummaries
+
+        console.log(`[IMAGE FETCH] Catalog API returned ${productSummaries?.length || 0} product summaries`)
 
         if (Array.isArray(productSummaries) && productSummaries.length > 0) {
           const catalogProduct = productSummaries[0] as any
           const stockImage = catalogProduct.image
           const stockAdditionalImages = catalogProduct.additionalImages
 
-          if (stockImage?.imageUrl) {
-            // Preserve original seller images for reference/debugging.
-            const originalSellerImage = product.image
-            const originalSellerAdditionalImages = product.additionalImages
+          console.log(`[IMAGE FETCH] Stock image from catalog:`, stockImage?.imageUrl || "None")
+          console.log(`[IMAGE FETCH] Stock additional images:`, stockAdditionalImages?.length || 0)
 
+          if (stockImage?.imageUrl) {
             // Prefer stock image for primary display and listing.
             product.image = stockImage
             product.additionalImages =
@@ -219,15 +234,61 @@ export async function GET(req: Request) {
               sellerAdditionalImages: originalSellerAdditionalImages || [],
               source: "stock_preferred_with_seller_fallback",
             }
+            
+            console.log(`[IMAGE FETCH] ✅ USING STOCK IMAGE: ${stockImage.imageUrl}`)
+            console.log(`[IMAGE FETCH] Additional images: ${product.additionalImages.length} (${Array.isArray(stockAdditionalImages) && stockAdditionalImages.length > 0 ? 'stock' : 'seller fallback'})`)
+          } else {
+            console.log(`[IMAGE FETCH] ⚠️ Catalog API returned product but no stock image URL found`)
+            // Set metadata to show we tried but no stock image available
+            product._imageSources = {
+              stockImage: null,
+              stockAdditionalImages: [],
+              sellerImage: originalSellerImage,
+              sellerAdditionalImages: originalSellerAdditionalImages || [],
+              source: "seller_only",
+            }
+            console.log(`[IMAGE FETCH] ✅ USING SELLER IMAGE (no stock image available):`, originalSellerImage?.imageUrl || "None")
           }
+        } else {
+          console.log(`[IMAGE FETCH] ⚠️ Catalog API returned no product summaries`)
+          // Set metadata to show we tried but no products found
+          product._imageSources = {
+            stockImage: null,
+            stockAdditionalImages: [],
+            sellerImage: originalSellerImage,
+            sellerAdditionalImages: originalSellerAdditionalImages || [],
+            source: "seller_only",
+          }
+          console.log(`[IMAGE FETCH] ✅ USING SELLER IMAGE (no catalog products found):`, originalSellerImage?.imageUrl || "None")
         }
+      } else {
+        const errorText = await catalogResponse.text().catch(() => "Unknown error")
+        console.log(`[IMAGE FETCH] ❌ Catalog API error: ${catalogResponse.status} - ${errorText.substring(0, 200)}`)
+        // Set metadata to show catalog API failed
+        product._imageSources = {
+          stockImage: null,
+          stockAdditionalImages: [],
+          sellerImage: originalSellerImage,
+          sellerAdditionalImages: originalSellerAdditionalImages || [],
+          source: "seller_only",
+        }
+        console.log(`[IMAGE FETCH] ✅ USING SELLER IMAGE (catalog API failed):`, originalSellerImage?.imageUrl || "None")
       }
-      // If catalogResponse is not ok or parsing fails, we intentionally do nothing
-      // and fall back to the Browse API images that are already in `product`.
-    } catch {
-      // Swallow all errors to avoid breaking legacy behaviour.
-      // The existing seller image paths remain untouched.
+    } catch (error) {
+      console.log(`[IMAGE FETCH] ❌ Exception while fetching stock image:`, error instanceof Error ? error.message : String(error))
+      // Set metadata to show exception occurred
+      product._imageSources = {
+        stockImage: null,
+        stockAdditionalImages: [],
+        sellerImage: originalSellerImage,
+        sellerAdditionalImages: originalSellerAdditionalImages || [],
+        source: "seller_only",
+      }
+      console.log(`[IMAGE FETCH] ✅ USING SELLER IMAGE (exception occurred):`, originalSellerImage?.imageUrl || "None")
     }
+    
+    console.log(`[IMAGE FETCH] Final image source: ${product._imageSources?.source || "unknown"}`)
+    console.log(`[IMAGE FETCH] Final primary image URL: ${product.image?.imageUrl || "None"}`)
     
     // Add metadata about the search for debugging
     const responseData = {
