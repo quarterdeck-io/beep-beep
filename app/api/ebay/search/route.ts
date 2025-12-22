@@ -33,20 +33,20 @@ function getHighResImageUrl(imageUrl: string | undefined): { url: string; isHigh
     return { url: imageUrl, isHighRes: true }
   }
   
-  // If image is 640px or larger, it meets the 500px requirement
-  // But eBay might be strict, so let's try to get a larger version
-  if (currentSize >= 640) {
+  // If image is 500px or larger, it meets eBay's minimum requirement
+  // Try to get a larger version for better quality (1200px)
+  if (currentSize >= 500) {
     // Try to get 1200px version (more likely to exist than 1600px)
     const highResUrl = imageUrl.replace(/\/s-l\d+\.jpg/i, '/s-l1200.jpg')
     console.log(`[IMAGE RESIZE] Converting ${currentSize}px -> 1200px: ${imageUrl} -> ${highResUrl}`)
     return { url: highResUrl, isHighRes: true }
   }
   
-  // If image is smaller than 640px, it might not meet requirements
-  // Try to convert to 1200px, but this might fail
-  if (currentSize > 0 && currentSize < 640) {
-    const highResUrl = imageUrl.replace(/\/s-l\d+\.jpg/i, '/s-l1200.jpg')
-    console.log(`[IMAGE RESIZE] Upscaling small image ${currentSize}px -> 1200px: ${imageUrl} -> ${highResUrl}`)
+  // If image is smaller than 500px, it doesn't meet eBay's requirement
+  // Try to convert to at least 500px, but this might fail
+  if (currentSize > 0 && currentSize < 500) {
+    const highResUrl = imageUrl.replace(/\/s-l\d+\.jpg/i, '/s-l500.jpg')
+    console.log(`[IMAGE RESIZE] Upscaling small image ${currentSize}px -> 500px: ${imageUrl} -> ${highResUrl}`)
     return { url: highResUrl, isHighRes: false } // Mark as potentially unreliable
   }
   
@@ -292,14 +292,13 @@ export async function GET(req: Request) {
             const stockImageSize = getImageSizeFromUrl(stockImage.imageUrl)
             console.log(`[IMAGE FETCH] Stock image size from URL: ${stockImageSize}px`)
             
-            // eBay is rejecting 640px images even though they technically meet the 500px requirement
-            // So we'll only use stock images if they're already 1200px or larger
-            // Otherwise, fall back to seller images which are usually already high-res from Browse API
-            if (stockImageSize > 0 && stockImageSize < 1200) {
-              console.log(`[IMAGE FETCH] ⚠️ Stock image too small (${stockImageSize}px < 1200px), falling back to seller images`)
-              console.log(`[IMAGE FETCH] Note: eBay rejects 640px images even though they meet 500px requirement`)
+            // eBay requires at least 500px on the longest side
+            // We'll use stock images if they're 500px or larger, otherwise fall back to seller images
+            if (stockImageSize > 0 && stockImageSize < 500) {
+              console.log(`[IMAGE FETCH] ⚠️ Stock image too small (${stockImageSize}px < 500px), falling back to seller images`)
+              console.log(`[IMAGE FETCH] Note: eBay requires at least 500px on the longest side`)
               
-              // Use seller images since stock images don't meet size requirements
+              // Use seller images since stock images don't meet eBay's 500px requirement
               product.image = originalSellerImage
               product.additionalImages = originalSellerAdditionalImages
               
@@ -313,10 +312,10 @@ export async function GET(req: Request) {
                 source: "seller_only_fallback_due_to_size",
               }
               
-              console.log(`[IMAGE FETCH] ✅ USING SELLER IMAGE (stock image ${stockImageSize}px too small):`, originalSellerImage?.imageUrl || "None")
+              console.log(`[IMAGE FETCH] ✅ USING SELLER IMAGE (stock image ${stockImageSize}px < 500px):`, originalSellerImage?.imageUrl || "None")
             } else {
-              // Stock image is 1200px+ or unknown size, try to use it
-              // Convert to high-res if needed
+              // Stock image is 500px+ or unknown size, try to use it
+              // Convert to high-res if needed for better quality
               const highResStockImage = getHighResImage(stockImage)
               
               if (!highResStockImage) {
@@ -347,9 +346,9 @@ export async function GET(req: Request) {
                       return converted || imgUrl // Use original if conversion fails
                     })
                     .filter((img: any) => {
-                      // Filter out images that are too small
+                      // Filter out images that are too small (eBay requires at least 500px)
                       const size = getImageSizeFromUrl(img.imageUrl)
-                      return size === 0 || size >= 640
+                      return size === 0 || size >= 500
                     })
                 : []
               
