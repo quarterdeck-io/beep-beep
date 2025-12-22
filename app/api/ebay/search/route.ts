@@ -324,20 +324,6 @@ export async function GET(req: Request) {
               
               console.log(`[IMAGE FETCH] ✅ USING SELLER IMAGE (stock image too small):`, originalSellerImage?.imageUrl || "None")
             }
-
-            // Attach metadata so the frontend/debug view can see both sources.
-            product._imageSources = {
-              stockImage: highResStockImage, // Store high-res version
-              stockImageOriginal: stockImage, // Store original for reference
-              stockAdditionalImages: highResStockAdditionalImages,
-              stockAdditionalImagesOriginal: stockAdditionalImages || [],
-              sellerImage: originalSellerImage,
-              sellerAdditionalImages: originalSellerAdditionalImages || [],
-              source: "stock_preferred_with_seller_fallback",
-            }
-            
-            console.log(`[IMAGE FETCH] ✅ USING HIGH-RES STOCK IMAGE: ${highResStockImage.imageUrl}`)
-            console.log(`[IMAGE FETCH] Additional images: ${product.additionalImages.length} (${highResStockAdditionalImages.length > 0 ? 'high-res stock' : 'seller fallback'})`)
           } else {
             console.log(`[IMAGE FETCH] ⚠️ Catalog API returned product but no stock image URL found`)
             // Set metadata to show we tried but no stock image available
