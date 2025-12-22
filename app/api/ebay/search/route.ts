@@ -376,6 +376,7 @@ export async function GET(req: Request) {
               
               console.log(`[IMAGE FETCH] ✅ USING HIGH-RES STOCK IMAGE: ${highResStockImage.imageUrl}`)
               console.log(`[IMAGE FETCH] Additional images: ${product.additionalImages.length} (${highResStockAdditionalImages.length > 0 ? 'high-res stock' : 'seller fallback'})`)
+              }
             }
           } else {
             console.log(`[IMAGE FETCH] ⚠️ Catalog API returned product but no stock image URL found`)
