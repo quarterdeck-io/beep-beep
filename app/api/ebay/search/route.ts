@@ -192,7 +192,7 @@ export async function GET(req: Request) {
       console.log(`[IMAGE FETCH] Catalog API URL: ${catalogApiUrl}`)
 
       const catalogResponse = await fetch(
-        `${catalogApiUrl}?q=${encodeURIComponent(upc)}&fieldgroups=PRODUCT`,
+        `${catalogApiUrl}?q=${encodeURIComponent(upc)}&fieldgroups=FULL`,
         {
           headers: {
             Authorization: `Bearer ${accessToken}`,
