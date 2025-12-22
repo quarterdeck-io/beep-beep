@@ -2,30 +2,42 @@ import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 
-// Helper function to convert eBay image URLs to higher resolution
-// eBay image URLs often have size parameters like /s-l640.jpg
-// We'll try to get larger versions (1600px) or remove size restrictions
+// Helper function to check if an eBay image URL meets minimum size requirements
+// eBay requires at least 500px on the longest side
+function getImageSizeFromUrl(imageUrl: string | undefined): number {
+  if (!imageUrl) return 0
+  
+  // Extract size from URL pattern: /s-l640.jpg -> 640
+  const match = imageUrl.match(/\/s-l(\d+)\.jpg/i)
+  if (match && match[1]) {
+    return parseInt(match[1], 10)
+  }
+  
+  // If no size parameter, assume it's full resolution (safe assumption)
+  return 9999
+}
+
+// Helper function to convert eBay image URLs to higher resolution only if needed
+// eBay requires at least 500px, so we only upscale if the image is smaller than 640px
+// We use the original URL if it's already 640px or larger (which meets the requirement)
 function getHighResImageUrl(imageUrl: string | undefined): string | undefined {
   if (!imageUrl) return undefined
   
-  // Try to convert to higher resolution version
-  // Pattern: https://i.ebayimg.com/images/g/XXX/s-l640.jpg -> s-l1600.jpg
-  if (imageUrl.includes('/s-l')) {
-    // Replace size parameter with larger version (1600px minimum for eBay requirements)
-    // eBay requires at least 500px, but 1600px is safer and commonly available
-    const highResUrl = imageUrl.replace(/\/s-l\d+\.jpg/i, '/s-l1600.jpg')
-    console.log(`[IMAGE RESIZE] Converting ${imageUrl} -> ${highResUrl}`)
-    return highResUrl
+  const currentSize = getImageSizeFromUrl(imageUrl)
+  
+  // If image is already 640px or larger, it meets eBay's 500px requirement
+  // Use it as-is to avoid potential 404 errors from non-existent high-res URLs
+  if (currentSize >= 640) {
+    console.log(`[IMAGE RESIZE] Image already ${currentSize}px (meets 500px requirement), using as-is: ${imageUrl}`)
+    return imageUrl
   }
   
-  // If URL has other size patterns, try to remove them
-  // Pattern: .../images/g/XXX/s-l225.jpg or similar
-  if (imageUrl.match(/\/s-\w+\.jpg/i)) {
-    // Try to get full resolution by removing size parameter
-    // This might not always work, but worth trying
-    const fullResUrl = imageUrl.replace(/\/s-\w+\.jpg/i, '.jpg')
-    console.log(`[IMAGE RESIZE] Attempting full-res by removing size param: ${imageUrl} -> ${fullResUrl}`)
-    return fullResUrl
+  // Only try to upscale if the image is smaller than 640px
+  if (imageUrl.includes('/s-l')) {
+    // Try 1200px first (safer, more likely to exist than 1600px)
+    const highResUrl = imageUrl.replace(/\/s-l\d+\.jpg/i, '/s-l1200.jpg')
+    console.log(`[IMAGE RESIZE] Upscaling ${currentSize}px -> 1200px: ${imageUrl} -> ${highResUrl}`)
+    return highResUrl
   }
   
   // If no size parameter, return as-is (might already be full resolution)
@@ -264,24 +276,54 @@ export async function GET(req: Request) {
           console.log(`[IMAGE FETCH] Stock additional images:`, stockAdditionalImages?.length || 0)
 
           if (stockImage?.imageUrl) {
-            // Convert stock images to high resolution for eBay listing requirements (min 500px)
-            const highResStockImage = getHighResImage(stockImage)
-            const highResStockAdditionalImages = Array.isArray(stockAdditionalImages)
-              ? stockAdditionalImages.map((img: any) => {
-                  const imgUrl = typeof img === 'string' ? { imageUrl: img } : img
-                  return getHighResImage(imgUrl)
-                })
-              : []
+            const stockImageSize = getImageSizeFromUrl(stockImage.imageUrl)
+            console.log(`[IMAGE FETCH] Stock image size: ${stockImageSize}px`)
             
-            console.log(`[IMAGE FETCH] High-res stock image:`, highResStockImage.imageUrl)
-            console.log(`[IMAGE FETCH] High-res stock additional images:`, highResStockAdditionalImages.length)
-            
-            // Prefer stock image for primary display and listing.
-            product.image = highResStockImage
-            product.additionalImages =
-              highResStockAdditionalImages.length > 0
-                ? highResStockAdditionalImages
-                : originalSellerAdditionalImages
+            // Only use stock images if they meet eBay's 500px requirement (we check for 640px+ to be safe)
+            // If stock images are too small, fall back to seller images to avoid listing errors
+            if (stockImageSize >= 640) {
+              // Stock image is already high enough resolution, use it as-is
+              console.log(`[IMAGE FETCH] Stock image meets size requirements (${stockImageSize}px >= 640px), using stock image`)
+              
+              product.image = stockImage
+              product.additionalImages =
+                Array.isArray(stockAdditionalImages) && stockAdditionalImages.length > 0
+                  ? stockAdditionalImages
+                  : originalSellerAdditionalImages
+              
+              // Attach metadata
+              product._imageSources = {
+                stockImage: stockImage,
+                stockImageOriginal: stockImage,
+                stockAdditionalImages: stockAdditionalImages || [],
+                stockAdditionalImagesOriginal: stockAdditionalImages || [],
+                sellerImage: originalSellerImage,
+                sellerAdditionalImages: originalSellerAdditionalImages || [],
+                source: "stock_preferred_with_seller_fallback",
+              }
+              
+              console.log(`[IMAGE FETCH] ✅ USING STOCK IMAGE (${stockImageSize}px): ${stockImage.imageUrl}`)
+              console.log(`[IMAGE FETCH] Additional images: ${product.additionalImages.length} (${Array.isArray(stockAdditionalImages) && stockAdditionalImages.length > 0 ? 'stock' : 'seller fallback'})`)
+            } else {
+              // Stock image is too small, use seller images instead to avoid listing errors
+              console.log(`[IMAGE FETCH] ⚠️ Stock image too small (${stockImageSize}px < 640px), falling back to seller images`)
+              
+              // Use seller images since stock images don't meet size requirements
+              product.image = originalSellerImage
+              product.additionalImages = originalSellerAdditionalImages
+              
+              product._imageSources = {
+                stockImage: stockImage,
+                stockImageOriginal: stockImage,
+                stockAdditionalImages: stockAdditionalImages || [],
+                stockAdditionalImagesOriginal: stockAdditionalImages || [],
+                sellerImage: originalSellerImage,
+                sellerAdditionalImages: originalSellerAdditionalImages || [],
+                source: "seller_only_fallback_due_to_size",
+              }
+              
+              console.log(`[IMAGE FETCH] ✅ USING SELLER IMAGE (stock image too small):`, originalSellerImage?.imageUrl || "None")
+            }
 
             // Attach metadata so the frontend/debug view can see both sources.
             product._imageSources = {
