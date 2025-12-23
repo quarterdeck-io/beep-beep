@@ -385,11 +385,51 @@ export async function POST(req: Request) {
 
     const currentOffer = await getOfferResponse.json()
     
-    // Get current quantity and increase by 1
-    const currentQuantity = currentOffer.availableQuantity || 1
+    // Determine the canonical current quantity from eBay
+    // Prefer the inventory item's shipToLocationAvailability.quantity (source of truth),
+    // fall back to the offer's availableQuantity if inventory item is not available.
+    let currentQuantity =
+      typeof currentOffer.availableQuantity === "number"
+        ? currentOffer.availableQuantity
+        : 0
+    let quantitySource: "offer" | "inventory_item" = "offer"
+
+    try {
+      const offerSkuForQuantity = currentOffer.sku
+      if (offerSkuForQuantity) {
+        const inventoryItemUrlForQuantity = `${baseUrl}/sell/inventory/v1/inventory_item/${offerSkuForQuantity}`
+        const inventoryItemResponseForQuantity = await fetch(inventoryItemUrlForQuantity, {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+            'Content-Language': 'en-US',
+            'Accept-Language': 'en-US',
+            'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
+          },
+        })
+
+        if (inventoryItemResponseForQuantity.ok) {
+          const inventoryItemForQuantity = await inventoryItemResponseForQuantity.json()
+          const inventoryQty =
+            inventoryItemForQuantity.availability?.shipToLocationAvailability?.quantity
+          if (typeof inventoryQty === "number") {
+            currentQuantity = inventoryQty
+            quantitySource = "inventory_item"
+          }
+        }
+      }
+    } catch (qtyError) {
+      console.warn("[INVENTORY] Could not fetch inventory item for canonical quantity:", qtyError)
+    }
+
+    // Sanitize current quantity
+    if (!Number.isFinite(currentQuantity) || currentQuantity < 0) {
+      currentQuantity = 0
+    }
+
     const newQuantity = currentQuantity + 1
 
-    console.log(`[INVENTORY] Current quantity: ${currentQuantity}, New quantity: ${newQuantity}`)
+    console.log(`[INVENTORY] Current quantity (${quantitySource}): ${currentQuantity}, New quantity: ${newQuantity}`)
     console.log(`[INVENTORY] Offer status: ${offerStatus}, Listing ID: ${listingId}`)
     console.log(`[INVENTORY] Current offer structure:`, JSON.stringify(currentOffer, null, 2))
     
