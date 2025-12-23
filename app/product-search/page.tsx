@@ -623,6 +623,16 @@ export default function ProductSearchPage() {
       }
       
       if (!response.ok) {
+        // DEBUG: Log error response
+        console.error("[FRONTEND DEBUG] Listing failed with status:", response.status)
+        console.error("[FRONTEND DEBUG] Error response data:", data)
+        console.error("[FRONTEND DEBUG] Error details:", {
+          error: data.error,
+          errorCode: data.errorCode,
+          received: data.received,
+          details: data.details
+        })
+        
         // Check if this is a missing item specifics error
         if (data.action === "missing_item_specifics" && data.missingItemSpecifics) {
           setMissingAspects(data.missingItemSpecifics)
