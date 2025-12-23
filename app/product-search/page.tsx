@@ -553,15 +553,22 @@ export default function ProductSearchPage() {
       const finalListingPrice = priceInfo.discounted.toFixed(2)
       
       // DEBUG: Log what we're sending for description
-      const descriptionToSend = editedDescription || productData.shortDescription || productData.description || ""
+      // When override is enabled, ONLY use editedDescription (even if empty)
+      // When override is disabled, use editedDescription or fall back to product data
+      const descriptionToSend = useOverrideDescription 
+        ? (editedDescription || "")  // Override mode: only use what user typed, even if empty
+        : (editedDescription || productData.shortDescription || productData.description || "")  // Normal mode: use edited or fall back to product data
+      
       console.log("[FRONTEND DEBUG] Listing to eBay - Description:", {
         useOverrideDescription: useOverrideDescription,
         editedDescription: editedDescription,
+        editedDescriptionLength: editedDescription ? editedDescription.length : 0,
         productDataShortDescription: productData.shortDescription,
         productDataDescription: productData.description,
         descriptionToSend: descriptionToSend,
         descriptionLength: descriptionToSend.length,
-        isEmpty: !descriptionToSend || descriptionToSend.trim().length === 0
+        isEmpty: !descriptionToSend || descriptionToSend.trim().length === 0,
+        willSendEmpty: useOverrideDescription && (!editedDescription || editedDescription.trim().length === 0)
       })
 
       const response = await fetch("/api/ebay/list", {

@@ -47,12 +47,14 @@ export async function POST(req: Request) {
     } = body
 
     // DEBUG: Log incoming description
+    console.log("[LIST API DEBUG] ========== LISTING REQUEST RECEIVED ==========")
     console.log("[LIST API DEBUG] Incoming description:", {
       description: description,
       descriptionType: typeof description,
       descriptionLength: description ? description.length : 0,
       isEmpty: !description || (typeof description === 'string' && description.trim().length === 0),
-      shortDescription: shortDescription
+      shortDescription: shortDescription,
+      descriptionPreview: description ? description.substring(0, 100) : "null/undefined"
     })
 
     // Validate and sanitize required fields
@@ -65,15 +67,23 @@ export async function POST(req: Request) {
       title = title.trim()
     }
     
-    // Description - provide default if empty
+    // Description - provide default if empty (but preserve empty string if explicitly sent)
     console.log("[LIST API DEBUG] Processing description - before:", {
       description: description,
-      isEmpty: !description || (typeof description === 'string' && description.trim().length === 0)
+      isEmpty: !description || (typeof description === 'string' && description.trim().length === 0),
+      isExplicitlyEmpty: description === ""
     })
     
-    if (!description || (typeof description === 'string' && description.trim().length === 0)) {
+    // Only set default if description is null/undefined, not if it's explicitly empty string
+    // This allows override description to be intentionally empty
+    if (description === null || description === undefined) {
       description = "No description provided." // Provide a default description
-      console.log("[LIST API DEBUG] Description was empty, set to default:", description)
+      console.log("[LIST API DEBUG] Description was null/undefined, set to default:", description)
+    } else if (typeof description === 'string' && description.trim().length === 0) {
+      // If it's an empty string, check if we should use default or keep it empty
+      // For now, we'll use default to ensure eBay listings have descriptions
+      description = "No description provided."
+      console.log("[LIST API DEBUG] Description was empty string, set to default:", description)
     } else {
       description = description.trim()
       console.log("[LIST API DEBUG] Description trimmed:", {
