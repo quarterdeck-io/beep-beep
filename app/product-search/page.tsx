@@ -196,6 +196,8 @@ export default function ProductSearchPage() {
     
     setError("")
     setProductData(null)
+    setInventoryMessage(null) // Clear any previous inventory success/error messages
+    setIncreasingInventory(false) // Reset inventory loading state
     setListingError(null) // Clear any previous listing errors
     setHasDuplicates(false) // Clear duplicate state for new search
     setDuplicateSku("")
