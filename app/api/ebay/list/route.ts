@@ -46,6 +46,15 @@ export async function POST(req: Request) {
       shortDescription  // Short description from Browse API (may contain Platform info)
     } = body
 
+    // DEBUG: Log incoming description
+    console.log("[LIST API DEBUG] Incoming description:", {
+      description: description,
+      descriptionType: typeof description,
+      descriptionLength: description ? description.length : 0,
+      isEmpty: !description || (typeof description === 'string' && description.trim().length === 0),
+      shortDescription: shortDescription
+    })
+
     // Validate and sanitize required fields
     const missingFields: string[] = []
     
@@ -57,10 +66,21 @@ export async function POST(req: Request) {
     }
     
     // Description - provide default if empty
+    console.log("[LIST API DEBUG] Processing description - before:", {
+      description: description,
+      isEmpty: !description || (typeof description === 'string' && description.trim().length === 0)
+    })
+    
     if (!description || (typeof description === 'string' && description.trim().length === 0)) {
       description = "No description provided." // Provide a default description
+      console.log("[LIST API DEBUG] Description was empty, set to default:", description)
     } else {
       description = description.trim()
+      console.log("[LIST API DEBUG] Description trimmed:", {
+        originalLength: body.description?.length,
+        trimmedLength: description.length,
+        preview: description.substring(0, 100)
+      })
     }
     
     // Seller note text (will be used in conditionDescription field, not in description)
@@ -291,8 +311,20 @@ export async function POST(req: Request) {
     }
     
     // Add description if provided
+    console.log("[LIST API DEBUG] Adding description to productObj:", {
+      hasDescription: !!(description && description.trim().length > 0),
+      descriptionValue: description,
+      isNoDescription: description === "No description",
+      willAdd: description && description.trim().length > 0 && description !== "No description"
+    })
     if (description && description.trim().length > 0 && description !== "No description") {
       productObj.description = description.substring(0, 50000)
+      console.log("[LIST API DEBUG] Added description to productObj:", {
+        length: productObj.description.length,
+        preview: productObj.description.substring(0, 100)
+      })
+    } else {
+      console.log("[LIST API DEBUG] NOT adding description to productObj (empty or 'No description')")
     }
     
     // Add images if provided - eBay expects imageUrls array
@@ -815,6 +847,12 @@ export async function POST(req: Request) {
 
     // Step 4: Create an offer
     // finalCategoryId is already determined during validation above
+    
+    console.log("[LIST API DEBUG] Creating offer payload with description:", {
+      description: description,
+      descriptionLength: description ? description.length : 0,
+      willUse: description ? description.substring(0, 50000) : null
+    })
     
     const offerPayload: any = {
       sku: finalSku,

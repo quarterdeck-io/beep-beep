@@ -552,6 +552,18 @@ export default function ProductSearchPage() {
       const priceInfo = calculateDiscountedPrice(listingPrice)
       const finalListingPrice = priceInfo.discounted.toFixed(2)
       
+      // DEBUG: Log what we're sending for description
+      const descriptionToSend = editedDescription || productData.shortDescription || productData.description || ""
+      console.log("[FRONTEND DEBUG] Listing to eBay - Description:", {
+        useOverrideDescription: useOverrideDescription,
+        editedDescription: editedDescription,
+        productDataShortDescription: productData.shortDescription,
+        productDataDescription: productData.description,
+        descriptionToSend: descriptionToSend,
+        descriptionLength: descriptionToSend.length,
+        isEmpty: !descriptionToSend || descriptionToSend.trim().length === 0
+      })
+
       const response = await fetch("/api/ebay/list", {
         method: "POST",
         headers: {
@@ -560,7 +572,7 @@ export default function ProductSearchPage() {
         body: JSON.stringify({
           // Editable fields
           title: editedTitle || productData.title || "",
-          description: editedDescription || productData.shortDescription || productData.description || "",
+          description: descriptionToSend,
           price: finalListingPrice, // Use discounted price with minimum floor
           condition: editedCondition || "Used - Very Good",
           
@@ -1705,24 +1717,44 @@ export default function ProductSearchPage() {
                     </div>
 
                     {/* Description - Editable */}
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">
-                        {useOverrideDescription ? "Override Description" : "Description"}
-                      </h3>
-                      {isEditing ? (
-                        <textarea
-                          value={editedDescription}
-                          onChange={(e) => setEditedDescription(e.target.value)}
-                          rows={4}
-                          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                          placeholder="Enter product description"
-                        />
-                      ) : (
-                        <p className="mt-1 text-gray-900 dark:text-white whitespace-pre-wrap">
-                          {productData.shortDescription || productData.description || "No description"}
-                        </p>
-                      )}
-                    </div>
+                    {/* When override is enabled, only show in edit mode. When disabled, show in both view and edit mode */}
+                    {useOverrideDescription ? (
+                      // Override Description mode: only show when editing
+                      isEditing && (
+                        <div>
+                          <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">
+                            Override Description
+                          </h3>
+                          <textarea
+                            value={editedDescription}
+                            onChange={(e) => setEditedDescription(e.target.value)}
+                            rows={4}
+                            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                            placeholder="Enter product description"
+                          />
+                        </div>
+                      )
+                    ) : (
+                      // Normal Description mode: show in both view and edit mode
+                      <div>
+                        <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">
+                          Description
+                        </h3>
+                        {isEditing ? (
+                          <textarea
+                            value={editedDescription}
+                            onChange={(e) => setEditedDescription(e.target.value)}
+                            rows={4}
+                            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                            placeholder="Enter product description"
+                          />
+                        ) : (
+                          <p className="mt-1 text-gray-900 dark:text-white whitespace-pre-wrap">
+                            {productData.shortDescription || productData.description || "No description"}
+                          </p>
+                        )}
+                      </div>
+                    )}
 
                     {/* Price - Editable */}
                     {productData.price && (() => {
