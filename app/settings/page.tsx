@@ -49,6 +49,11 @@ export default function SettingsPage() {
   const [loadingDiscount, setLoadingDiscount] = useState(false)
   const [savingDiscount, setSavingDiscount] = useState(false)
 
+  // Override Description Settings state
+  const [useOverrideDescription, setUseOverrideDescription] = useState<boolean>(false)
+  const [loadingOverrideDescription, setLoadingOverrideDescription] = useState(false)
+  const [savingOverrideDescription, setSavingOverrideDescription] = useState(false)
+
   // Fetch current settings on mount
   useEffect(() => {
     const fetchSettings = async () => {
@@ -171,6 +176,26 @@ export default function SettingsPage() {
     }
 
     fetchDiscountSettings()
+  }, [])
+
+  // Fetch override description settings on mount
+  useEffect(() => {
+    const fetchOverrideDescriptionSettings = async () => {
+      try {
+        setLoadingOverrideDescription(true)
+        const res = await fetch("/api/settings/override-description")
+        if (res.ok) {
+          const data = await res.json()
+          setUseOverrideDescription(data.useOverrideDescription || false)
+        }
+      } catch (error) {
+        console.error("Failed to fetch override description settings:", error)
+      } finally {
+        setLoadingOverrideDescription(false)
+      }
+    }
+
+    fetchOverrideDescriptionSettings()
   }, [])
 
   // Fetch available policies when user clicks to load them
@@ -421,6 +446,36 @@ export default function SettingsPage() {
       setMessage({ type: "error", text: "Failed to save discount settings" })
     } finally {
       setSavingDiscount(false)
+    }
+  }
+
+  const handleSaveOverrideDescriptionSettings = async () => {
+    setSavingOverrideDescription(true)
+    setMessage(null)
+
+    try {
+      const res = await fetch("/api/settings/override-description", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          useOverrideDescription: useOverrideDescription,
+        }),
+      })
+
+      const data = await res.json()
+
+      if (res.ok) {
+        setMessage({ type: "success", text: "✓ Override description setting saved successfully" })
+      } else {
+        const errorMsg = data.details ? `${data.error}: ${data.details}` : (data.error || "Failed to save override description setting")
+        setMessage({ type: "error", text: errorMsg })
+      }
+    } catch (error) {
+      setMessage({ type: "error", text: "Failed to save override description setting" })
+    } finally {
+      setSavingOverrideDescription(false)
     }
   }
 
@@ -883,6 +938,57 @@ export default function SettingsPage() {
                     className="px-6 py-2 bg-gray-800 dark:bg-gray-700 text-white rounded-md hover:bg-gray-700 dark:hover:bg-gray-600 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {savingDiscount ? "Saving..." : "Save Discount Settings"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Override Description Settings Card */}
+          <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6 mt-6">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+              Override Description Setting
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+              When enabled, the description field on the product listing page will be labeled as "Override Description" and you can manually enter your own description for each listing.
+            </p>
+
+            {loadingOverrideDescription ? (
+              <div className="text-center py-4">
+                <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">Loading override description settings...</p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {/* Toggle Switch */}
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <label className="block text-sm font-medium text-gray-900 dark:text-white mb-1">
+                      Use Override Description
+                    </label>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      Enable this to replace the "Description" label with "Override Description" on the product listing page
+                    </p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={useOverrideDescription}
+                      onChange={(e) => setUseOverrideDescription(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                  </label>
+                </div>
+
+                {/* Save Button */}
+                <div className="pt-4">
+                  <button
+                    onClick={handleSaveOverrideDescriptionSettings}
+                    disabled={savingOverrideDescription}
+                    className="px-6 py-2 bg-gray-800 dark:bg-gray-700 text-white rounded-md hover:bg-gray-700 dark:hover:bg-gray-600 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {savingOverrideDescription ? "Saving..." : "Save Override Description Setting"}
                   </button>
                 </div>
               </div>

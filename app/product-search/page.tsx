@@ -78,6 +78,9 @@ export default function ProductSearchPage() {
   const [discountPercentage, setDiscountPercentage] = useState<number>(30)
   const [minimumPrice, setMinimumPrice] = useState<number>(4.0)
   
+  // Override description settings state
+  const [useOverrideDescription, setUseOverrideDescription] = useState<boolean>(false)
+  
   // Available conditions for dropdown
   const conditions = [
     "Used - Very Good",
@@ -189,6 +192,22 @@ export default function ProductSearchPage() {
       }
     }
     loadDiscountSettings()
+
+    // Fetch override description settings
+    const loadOverrideDescriptionSettings = async () => {
+      try {
+        const res = await fetch("/api/settings/override-description")
+        if (res.ok) {
+          const data = await res.json()
+          setUseOverrideDescription(data.useOverrideDescription || false)
+        }
+      } catch (error) {
+        console.error("Failed to fetch override description settings:", error)
+        // Use default if fetch fails
+        setUseOverrideDescription(false)
+      }
+    }
+    loadOverrideDescriptionSettings()
   }, [])
 
   const performSearch = async (searchValue: string) => {
@@ -1684,7 +1703,7 @@ export default function ProductSearchPage() {
                     {/* Description - Editable */}
                     <div>
                       <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">
-                        Description
+                        {useOverrideDescription ? "Override Description" : "Description"}
                       </h3>
                       {isEditing ? (
                         <textarea

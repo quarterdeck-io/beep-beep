@@ -20,9 +20,10 @@ model User {
   ebayBusinessPolicies EbayBusinessPolicies?
   ebayTokens           EbayToken?
   sessions             Session[]
-  skuSettings          SkuSettings?
-  bannedKeywords       BannedKeyword[]
-  discountSettings     DiscountSettings?
+  skuSettings                SkuSettings?
+  bannedKeywords             BannedKeyword[]
+  discountSettings           DiscountSettings?
+  overrideDescriptionSettings OverrideDescriptionSettings?
 }
 
 model Account {
@@ -116,4 +117,13 @@ model DiscountSettings {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
   user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model OverrideDescriptionSettings {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  useOverrideDescription Boolean @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
