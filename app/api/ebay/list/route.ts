@@ -3,21 +3,27 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 
 export async function POST(req: Request) {
+  console.log("[LIST API DEBUG] ========== LISTING REQUEST STARTED ==========")
   try {
     // Check if user is authenticated
     const session = await auth()
     
     if (!session) {
+      console.log("[LIST API DEBUG] ERROR: Unauthorized - no session")
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
       )
     }
+    
+    console.log("[LIST API DEBUG] User authenticated:", session.user.id)
 
     let body
     try {
       body = await req.json()
+      console.log("[LIST API DEBUG] Request body parsed successfully")
     } catch (parseError) {
+      console.log("[LIST API DEBUG] ERROR: Failed to parse JSON:", parseError)
       return NextResponse.json(
         { error: "Invalid request body. Could not parse JSON." },
         { status: 400 }
@@ -117,6 +123,15 @@ export async function POST(req: Request) {
     }
 
     if (missingFields.length > 0) {
+      console.log("[LIST API DEBUG] ERROR: Missing required fields:", missingFields)
+      console.log("[LIST API DEBUG] Received data:", {
+        title: title || null,
+        description: description || null,
+        descriptionLength: description ? description.length : 0,
+        price,
+        condition: condition || null,
+        hasImage
+      })
       return NextResponse.json(
         { 
           error: `Missing or invalid required fields: ${missingFields.join(", ")}`,
@@ -1451,7 +1466,11 @@ export async function POST(req: Request) {
       listingUrl: `https://www.ebay.com/itm/${publishData.listingId}`,
     })
   } catch (error) {
-    console.error("Error in eBay list endpoint:", error)
+    console.error("[LIST API DEBUG] ========== ERROR IN LISTING ==========")
+    console.error("[LIST API DEBUG] Error type:", error instanceof Error ? error.constructor.name : typeof error)
+    console.error("[LIST API DEBUG] Error message:", error instanceof Error ? error.message : String(error))
+    console.error("[LIST API DEBUG] Error stack:", error instanceof Error ? error.stack : "No stack trace")
+    console.error("[LIST API DEBUG] Full error object:", error)
     return NextResponse.json(
       { 
         error: "Something went wrong", 
