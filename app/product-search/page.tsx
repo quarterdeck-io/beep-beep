@@ -249,7 +249,9 @@ export default function ProductSearchPage() {
       setProductData(productDataWithDefaultCondition)
       // Initialize editable fields with product data
       setEditedTitle(data.title || "")
-      setEditedDescription(data.shortDescription || data.description || "")
+      // If override description is enabled, start with empty description so user can type their own
+      // Otherwise, populate from product data
+      setEditedDescription(useOverrideDescription ? "" : (data.shortDescription || data.description || ""))
       setEditedCondition(defaultCondition)
       setEditedPrice(data.price?.value || "0.00")
       setIsMeanPrice(data._searchMetadata?.isMeanPrice || false)
@@ -295,7 +297,9 @@ export default function ProductSearchPage() {
     // Reset to original values, but always default condition to "Used - Very Good"
     if (productData) {
       setEditedTitle(productData.title || "")
-      setEditedDescription(productData.shortDescription || productData.description || "")
+      // If override description is enabled, reset to empty description
+      // Otherwise, reset to product data description
+      setEditedDescription(useOverrideDescription ? "" : (productData.shortDescription || productData.description || ""))
       setEditedCondition("Used - Very Good")
       setEditedPrice(productData.price?.value || "0.00")
     }
