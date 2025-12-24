@@ -584,6 +584,12 @@ export async function POST(req: Request) {
     }
     
     // Build inventory payload (SKU is in URL, not body!)
+    console.log("[LIST API DEBUG] ========== BUILDING INVENTORY ITEM PAYLOAD ==========")
+    console.log("[LIST API DEBUG] productObj before adding to payload:", JSON.stringify(productObj, null, 2))
+    console.log("[LIST API DEBUG] productObj.description exists:", !!productObj.description)
+    console.log("[LIST API DEBUG] productObj.description value:", productObj.description)
+    console.log("[LIST API DEBUG] productObj.description length:", productObj.description ? productObj.description.length : 0)
+    
     const inventoryItemPayload: any = {
       product: productObj,
       condition: mapConditionToEbay(condition),
@@ -597,6 +603,9 @@ export async function POST(req: Request) {
     // Set seller note in conditionDescription field (this appears as "Seller Notes" on eBay)
     // Note: eBay uses conditionDescription field to display "Seller Notes" in the listing
     inventoryItemPayload.conditionDescription = sellerNote
+    
+    console.log("[LIST API DEBUG] inventoryItemPayload.product.description:", inventoryItemPayload.product.description)
+    console.log("[LIST API DEBUG] Full inventoryItemPayload:", JSON.stringify(inventoryItemPayload, null, 2))
     
     // Log the payload for debugging
     console.log("Creating inventory item with payload:", JSON.stringify(inventoryItemPayload, null, 2))
@@ -873,17 +882,27 @@ export async function POST(req: Request) {
     // Step 4: Create an offer
     // finalCategoryId is already determined during validation above
     
+    console.log("[LIST API DEBUG] ========== BUILDING OFFER PAYLOAD ==========")
     console.log("[LIST API DEBUG] Creating offer payload with description:", {
       description: description,
       descriptionLength: description ? description.length : 0,
-      willUse: description ? description.substring(0, 50000) : null
+      descriptionPreview: description ? description.substring(0, 100) : "null/undefined",
+      willUse: description ? description.substring(0, 50000) : null,
+      willUseLength: description ? Math.min(description.length, 50000) : 0
+    })
+    
+    const listingDescriptionForOffer = description ? description.substring(0, 50000) : ""
+    console.log("[LIST API DEBUG] listingDescriptionForOffer:", {
+      value: listingDescriptionForOffer,
+      length: listingDescriptionForOffer.length,
+      preview: listingDescriptionForOffer.substring(0, 100)
     })
     
     const offerPayload: any = {
       sku: finalSku,
       marketplaceId: "EBAY_US",
       format: "FIXED_PRICE",
-      listingDescription: description.substring(0, 50000), // eBay description limit (seller note is in conditionDescription, not here)
+      listingDescription: listingDescriptionForOffer, // eBay description limit (seller note is in conditionDescription, not here)
       listingDuration: "GTC", // Good 'Til Cancelled - recommended for fixed price
       includeCatalogProductDetails: true, // Use eBay catalog data when available
       pricingSummary: {
@@ -906,8 +925,18 @@ export async function POST(req: Request) {
       }
     }
     
+    console.log("[LIST API DEBUG] ========== OFFER PAYLOAD BEFORE SENDING ==========")
+    console.log("[LIST API DEBUG] offerPayload.listingDescription:", {
+      exists: !!offerPayload.listingDescription,
+      value: offerPayload.listingDescription,
+      length: offerPayload.listingDescription ? offerPayload.listingDescription.length : 0,
+      preview: offerPayload.listingDescription ? offerPayload.listingDescription.substring(0, 100) : "null/undefined"
+    })
+    console.log("[LIST API DEBUG] Full offerPayload:", JSON.stringify(offerPayload, null, 2))
+    
     console.log("Offer payload includes:", {
       listingDuration: offerPayload.listingDuration,
+      listingDescription: offerPayload.listingDescription ? `${offerPayload.listingDescription.substring(0, 50)}... (${offerPayload.listingDescription.length} chars)` : "MISSING",
       includeCatalogProductDetails: offerPayload.includeCatalogProductDetails,
       categoryId: finalCategoryId,
       hasEpid: !!epid,
@@ -947,6 +976,9 @@ export async function POST(req: Request) {
         body: JSON.stringify(offerPayload),
       }
     )
+    
+    console.log("[LIST API DEBUG] ========== OFFER API RESPONSE ==========")
+    console.log("[LIST API DEBUG] Offer API Response Status:", offerResponse.status, offerResponse.statusText)
 
     // Check for 401 Unauthorized - token might be invalid
     if (offerResponse.status === 401) {
@@ -1216,6 +1248,10 @@ export async function POST(req: Request) {
     }
 
     const offerData = await offerResponse.json()
+    console.log("[LIST API DEBUG] ========== OFFER CREATED SUCCESSFULLY ==========")
+    console.log("[LIST API DEBUG] Offer Response Data:", JSON.stringify(offerData, null, 2))
+    console.log("[LIST API DEBUG] Offer ID:", offerData.offerId)
+    
     const offerId = offerData.offerId
 
     if (!offerId) {
@@ -1440,7 +1476,15 @@ export async function POST(req: Request) {
       )
     }
 
+    console.log("[LIST API DEBUG] ========== PUBLISH RESPONSE ==========")
+    console.log("[LIST API DEBUG] Publish Response Status:", publishResponse.status, publishResponse.statusText)
+    
     const publishData = await publishResponse.json()
+    
+    console.log("[LIST API DEBUG] Publish Response Data:", JSON.stringify(publishData, null, 2))
+    console.log("[LIST API DEBUG] Listing ID:", publishData.listingId)
+    console.log("[LIST API DEBUG] Warnings:", publishData.warnings || "None")
+    console.log("[LIST API DEBUG] ========== LISTING COMPLETE ==========")
 
     // Update SKU counter after successful listing
     if (shouldIncrementCounter) {
