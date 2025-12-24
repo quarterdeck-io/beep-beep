@@ -251,6 +251,7 @@ export default function ProductSearchPage() {
       setEditedTitle(data.title || "")
       // If override description is enabled, start with empty description so user can type their own
       // Otherwise, populate from product data
+      // Note: If user has previously saved an override description, it will be in productData and will be preserved when they edit again
       setEditedDescription(useOverrideDescription ? "" : (data.shortDescription || data.description || ""))
       setEditedCondition(defaultCondition)
       setEditedPrice(data.price?.value || "0.00")
@@ -297,9 +298,17 @@ export default function ProductSearchPage() {
     // Reset to original values, but always default condition to "Used - Very Good"
     if (productData) {
       setEditedTitle(productData.title || "")
-      // If override description is enabled, reset to empty description
-      // Otherwise, reset to product data description
-      setEditedDescription(useOverrideDescription ? "" : (productData.shortDescription || productData.description || ""))
+      // If override description is enabled:
+      // - If productData has a saved description (from previous save), use it
+      // - Otherwise, reset to empty so user can type new one
+      // If override is disabled, reset to product data description
+      if (useOverrideDescription) {
+        // Check if there's a previously saved description in productData
+        const savedDescription = productData.description || productData.shortDescription || ""
+        setEditedDescription(savedDescription)
+      } else {
+        setEditedDescription(productData.shortDescription || productData.description || "")
+      }
       setEditedCondition("Used - Very Good")
       setEditedPrice(productData.price?.value || "0.00")
     }
@@ -553,10 +562,12 @@ export default function ProductSearchPage() {
       const finalListingPrice = priceInfo.discounted.toFixed(2)
       
       // DEBUG: Log what we're sending for description
-      // When override is enabled, ONLY use editedDescription (even if empty)
-      // When override is disabled, use editedDescription or fall back to product data
+      // When override is enabled: use editedDescription, but fall back to eBay description if empty (to avoid empty listing errors)
+      // When override is disabled: use editedDescription or fall back to product data
       const descriptionToSend = useOverrideDescription 
-        ? (editedDescription || "")  // Override mode: only use what user typed, even if empty
+        ? (editedDescription && editedDescription.trim().length > 0 
+            ? editedDescription  // Override mode: use what user typed if not empty
+            : (productData.shortDescription || productData.description || ""))  // Fallback to eBay description if override is empty
         : (editedDescription || productData.shortDescription || productData.description || "")  // Normal mode: use edited or fall back to product data
       
       console.log("[FRONTEND DEBUG] Listing to eBay - Description:", {
@@ -1682,6 +1693,16 @@ export default function ProductSearchPage() {
                             // Ensure condition defaults to "Used - Very Good" if empty
                             if (!editedCondition || editedCondition.trim() === "") {
                               setEditedCondition("Used - Very Good")
+                            }
+                            // When entering edit mode, initialize editedDescription
+                            // If override is enabled and there's a previously saved description, use it
+                            // Otherwise, use product data description or empty if override is enabled
+                            if (useOverrideDescription) {
+                              // Check if there's a previously saved description in productData
+                              const savedDescription = productData.description || productData.shortDescription || ""
+                              setEditedDescription(savedDescription)
+                            } else {
+                              setEditedDescription(productData.shortDescription || productData.description || "")
                             }
                             setIsEditing(true)
                           }}
