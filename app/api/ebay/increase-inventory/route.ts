@@ -438,12 +438,27 @@ export async function POST(req: Request) {
 
     // Build update payload with only the fields that can be updated
     // eBay requires specific fields for offer updates - must match the structure from GET
+    // IMPORTANT: listingDescription must be between 1-500000 characters (cannot be empty)
+    let listingDescription = currentOffer.listingDescription?.trim() || "No description provided."
+    
+    // Validate listingDescription length (eBay requires 1-500000 characters)
+    if (listingDescription.length === 0 || listingDescription.length > 500000) {
+      console.error(`[INVENTORY] Invalid listingDescription length: ${listingDescription.length}. Using fallback.`)
+      // Use a safe default that meets eBay's requirements
+      listingDescription = "Product listing."
+    }
+    
+    // Log if we had to use a fallback description
+    if (!currentOffer.listingDescription?.trim()) {
+      console.log(`[INVENTORY] ⚠️ Offer had empty listingDescription, using fallback: "${listingDescription}"`)
+    }
+    
     const updatePayload: any = {
       sku: currentOffer.sku,
       marketplaceId: currentOffer.marketplaceId || "EBAY_US",
       format: currentOffer.format || "FIXED_PRICE",
       availableQuantity: newQuantity,
-      listingDescription: currentOffer.listingDescription || "",
+      listingDescription: listingDescription, // Ensure it's never empty (eBay requires 1-500000 chars)
       listingDuration: currentOffer.listingDuration || "GTC",
       pricingSummary: currentOffer.pricingSummary,
       categoryId: currentOffer.categoryId,
