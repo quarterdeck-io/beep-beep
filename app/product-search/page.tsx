@@ -1815,7 +1815,16 @@ export default function ProductSearchPage() {
                           </h3>
                           <textarea
                             value={editedDescription}
-                            onChange={(e) => setEditedDescription(e.target.value)}
+                            onChange={(e) => {
+                              const newValue = e.target.value
+                              console.log("[FRONTEND DEBUG] Override Description field changed:", {
+                                oldValue: editedDescription,
+                                newValue: newValue,
+                                newValueLength: newValue.length,
+                                isTyping: newValue.length > (editedDescription?.length || 0)
+                              })
+                              setEditedDescription(newValue)
+                            }}
                             rows={4}
                             className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                             placeholder="Enter product description"
