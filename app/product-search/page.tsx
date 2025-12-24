@@ -276,6 +276,16 @@ export default function ProductSearchPage() {
   const handleSaveEdit = () => {
     if (!productData) return
     
+    console.log("[FRONTEND DEBUG] ========== SAVE EDIT CLICKED ==========")
+    console.log("[FRONTEND DEBUG] Save Edit - Description:", {
+      useOverrideDescription: useOverrideDescription,
+      editedDescription: editedDescription,
+      editedDescriptionLength: editedDescription ? editedDescription.length : 0,
+      previousProductDataDescription: productData.description,
+      previousProductDataShortDescription: productData.shortDescription,
+      willSave: editedDescription
+    })
+    
     // Update product data with edited values
     setProductData({
       ...productData,
@@ -289,12 +299,15 @@ export default function ProductSearchPage() {
         currency: productData.price?.currency || "USD"
       }
     })
+    
+    console.log("[FRONTEND DEBUG] Product data updated with description:", editedDescription)
     setIsEditing(false)
     setListingSuccess(null)
     setListingError(null)
   }
   
   const handleCancelEdit = () => {
+    console.log("[FRONTEND DEBUG] ========== CANCEL EDIT CLICKED ==========")
     // Reset to original values, but always default condition to "Used - Very Good"
     if (productData) {
       setEditedTitle(productData.title || "")
@@ -305,14 +318,21 @@ export default function ProductSearchPage() {
       if (useOverrideDescription) {
         // Check if there's a previously saved description in productData
         const savedDescription = productData.description || productData.shortDescription || ""
+        console.log("[FRONTEND DEBUG] Cancel - Override enabled, resetting to saved description:", {
+          savedDescription: savedDescription,
+          savedDescriptionLength: savedDescription.length
+        })
         setEditedDescription(savedDescription)
       } else {
-        setEditedDescription(productData.shortDescription || productData.description || "")
+        const normalDescription = productData.shortDescription || productData.description || ""
+        console.log("[FRONTEND DEBUG] Cancel - Override disabled, resetting to normal description:", normalDescription)
+        setEditedDescription(normalDescription)
       }
       setEditedCondition("Used - Very Good")
       setEditedPrice(productData.price?.value || "0.00")
     }
     setIsEditing(false)
+    console.log("[FRONTEND DEBUG] Edit mode cancelled")
   }
   
   const handleClearProduct = () => {
@@ -564,13 +584,24 @@ export default function ProductSearchPage() {
       // DEBUG: Log what we're sending for description
       // When override is enabled: use editedDescription, but fall back to eBay description if empty (to avoid empty listing errors)
       // When override is disabled: use editedDescription or fall back to product data
+      console.log("[FRONTEND DEBUG] ========== LIST ON EBAY CLICKED ==========")
+      console.log("[FRONTEND DEBUG] Listing - Description state before processing:", {
+        useOverrideDescription: useOverrideDescription,
+        editedDescription: editedDescription,
+        editedDescriptionLength: editedDescription ? editedDescription.length : 0,
+        editedDescriptionIsEmpty: !editedDescription || editedDescription.trim().length === 0,
+        productDataShortDescription: productData.shortDescription,
+        productDataDescription: productData.description,
+        productDataDescriptionLength: productData.description ? productData.description.length : 0
+      })
+      
       const descriptionToSend = useOverrideDescription 
         ? (editedDescription && editedDescription.trim().length > 0 
             ? editedDescription  // Override mode: use what user typed if not empty
             : (productData.shortDescription || productData.description || ""))  // Fallback to eBay description if override is empty
         : (editedDescription || productData.shortDescription || productData.description || "")  // Normal mode: use edited or fall back to product data
       
-      console.log("[FRONTEND DEBUG] Listing to eBay - Description:", {
+      console.log("[FRONTEND DEBUG] Listing to eBay - Final Description Decision:", {
         useOverrideDescription: useOverrideDescription,
         editedDescription: editedDescription,
         editedDescriptionLength: editedDescription ? editedDescription.length : 0,
@@ -579,7 +610,10 @@ export default function ProductSearchPage() {
         descriptionToSend: descriptionToSend,
         descriptionLength: descriptionToSend.length,
         isEmpty: !descriptionToSend || descriptionToSend.trim().length === 0,
-        willSendEmpty: useOverrideDescription && (!editedDescription || editedDescription.trim().length === 0)
+        usedFallback: useOverrideDescription && (!editedDescription || editedDescription.trim().length === 0),
+        decision: useOverrideDescription 
+          ? (editedDescription && editedDescription.trim().length > 0 ? "USED_OVERRIDE" : "USED_FALLBACK")
+          : (editedDescription ? "USED_EDITED" : "USED_PRODUCT_DATA")
       })
 
       const response = await fetch("/api/ebay/list", {
@@ -1697,14 +1731,30 @@ export default function ProductSearchPage() {
                             // When entering edit mode, initialize editedDescription
                             // If override is enabled and there's a previously saved description, use it
                             // Otherwise, use product data description or empty if override is enabled
+                            console.log("[FRONTEND DEBUG] ========== EDIT CLICKED ==========")
+                            console.log("[FRONTEND DEBUG] Edit Clicked - Current state:", {
+                              useOverrideDescription: useOverrideDescription,
+                              productDataDescription: productData.description,
+                              productDataShortDescription: productData.shortDescription,
+                              currentEditedDescription: editedDescription
+                            })
+                            
                             if (useOverrideDescription) {
                               // Check if there's a previously saved description in productData
                               const savedDescription = productData.description || productData.shortDescription || ""
+                              console.log("[FRONTEND DEBUG] Override enabled - Loading saved description:", {
+                                savedDescription: savedDescription,
+                                savedDescriptionLength: savedDescription.length,
+                                source: productData.description ? "productData.description" : (productData.shortDescription ? "productData.shortDescription" : "empty")
+                              })
                               setEditedDescription(savedDescription)
                             } else {
-                              setEditedDescription(productData.shortDescription || productData.description || "")
+                              const normalDescription = productData.shortDescription || productData.description || ""
+                              console.log("[FRONTEND DEBUG] Override disabled - Loading normal description:", normalDescription)
+                              setEditedDescription(normalDescription)
                             }
                             setIsEditing(true)
+                            console.log("[FRONTEND DEBUG] Edit mode enabled")
                           }}
                           className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors duration-200 flex items-center gap-2"
                         >
