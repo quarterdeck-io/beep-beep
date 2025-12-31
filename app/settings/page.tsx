@@ -49,6 +49,11 @@ export default function SettingsPage() {
   const [loadingDiscount, setLoadingDiscount] = useState(false)
   const [savingDiscount, setSavingDiscount] = useState(false)
 
+  // Edit Mode Settings state
+  const [defaultEditMode, setDefaultEditMode] = useState<boolean>(false)
+  const [loadingEditMode, setLoadingEditMode] = useState(false)
+  const [savingEditMode, setSavingEditMode] = useState(false)
+
   // Override Description Settings state
   const [useOverrideDescription, setUseOverrideDescription] = useState<boolean>(false)
   const [loadingOverrideDescription, setLoadingOverrideDescription] = useState(false)
@@ -176,6 +181,26 @@ export default function SettingsPage() {
     }
 
     fetchDiscountSettings()
+  }, [])
+
+  // Fetch edit mode settings on mount
+  useEffect(() => {
+    const fetchEditModeSettings = async () => {
+      try {
+        setLoadingEditMode(true)
+        const res = await fetch("/api/settings/edit-mode")
+        if (res.ok) {
+          const data = await res.json()
+          setDefaultEditMode(data.defaultEditMode || false)
+        }
+      } catch (error) {
+        console.error("Failed to fetch edit mode settings:", error)
+      } finally {
+        setLoadingEditMode(false)
+      }
+    }
+
+    fetchEditModeSettings()
   }, [])
 
   // Fetch override description settings on mount
@@ -446,6 +471,36 @@ export default function SettingsPage() {
       setMessage({ type: "error", text: "Failed to save discount settings" })
     } finally {
       setSavingDiscount(false)
+    }
+  }
+
+  const handleSaveEditModeSettings = async () => {
+    setSavingEditMode(true)
+    setMessage(null)
+
+    try {
+      const res = await fetch("/api/settings/edit-mode", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          defaultEditMode: defaultEditMode,
+        }),
+      })
+
+      const data = await res.json()
+
+      if (res.ok) {
+        setMessage({ type: "success", text: "✓ Edit mode settings saved successfully" })
+      } else {
+        const errorMsg = data.details ? `${data.error}: ${data.details}` : (data.error || "Failed to save edit mode settings")
+        setMessage({ type: "error", text: errorMsg })
+      }
+    } catch (error) {
+      setMessage({ type: "error", text: "Failed to save edit mode settings" })
+    } finally {
+      setSavingEditMode(false)
     }
   }
 
@@ -938,6 +993,65 @@ export default function SettingsPage() {
                     className="px-6 py-2 bg-gray-800 dark:bg-gray-700 text-white rounded-md hover:bg-gray-700 dark:hover:bg-gray-600 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {savingDiscount ? "Saving..." : "Save Discount Settings"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Edit Mode Settings Card */}
+          <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6 mt-6">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+              Default Edit Mode
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+              When enabled, the product listing page will open directly in edit mode. When disabled, you'll need to click the "Edit" button to edit listings.
+            </p>
+
+            {loadingEditMode ? (
+              <div className="text-center py-4">
+                <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">Loading edit mode settings...</p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {/* Toggle Switch */}
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <label className="block text-sm font-medium text-gray-900 dark:text-white mb-1">
+                      Enable Default Edit Mode
+                    </label>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {defaultEditMode 
+                        ? "Listings will open in edit mode automatically" 
+                        : "Listings will open in view mode (click Edit to modify)"}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setDefaultEditMode(!defaultEditMode)}
+                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                      defaultEditMode ? "bg-blue-600" : "bg-gray-200 dark:bg-gray-700"
+                    }`}
+                    role="switch"
+                    aria-checked={defaultEditMode}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        defaultEditMode ? "translate-x-5" : "translate-x-0"
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {/* Save Button */}
+                <div className="pt-4">
+                  <button
+                    onClick={handleSaveEditModeSettings}
+                    disabled={savingEditMode}
+                    className="px-6 py-2 bg-gray-800 dark:bg-gray-700 text-white rounded-md hover:bg-gray-700 dark:hover:bg-gray-600 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {savingEditMode ? "Saving..." : "Save Edit Mode Settings"}
                   </button>
                 </div>
               </div>

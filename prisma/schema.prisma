@@ -24,6 +24,7 @@ model User {
   bannedKeywords             BannedKeyword[]
   discountSettings           DiscountSettings?
   overrideDescriptionSettings OverrideDescriptionSettings?
+  editModeSettings           EditModeSettings?
 }
 
 model Account {
@@ -123,6 +124,15 @@ model OverrideDescriptionSettings {
   id                String   @id @default(cuid())
   userId            String   @unique
   useOverrideDescription Boolean @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model EditModeSettings {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  defaultEditMode   Boolean  @default(false)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
   user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)

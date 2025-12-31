@@ -78,6 +78,9 @@ export default function ProductSearchPage() {
   const [discountPercentage, setDiscountPercentage] = useState<number>(30)
   const [minimumPrice, setMinimumPrice] = useState<number>(4.0)
   
+  // Edit mode settings state
+  const [defaultEditMode, setDefaultEditMode] = useState<boolean>(false)
+  
   // Override description settings state
   const [useOverrideDescription, setUseOverrideDescription] = useState<boolean>(false)
   
@@ -193,6 +196,22 @@ export default function ProductSearchPage() {
     }
     loadDiscountSettings()
 
+    // Fetch edit mode settings
+    const loadEditModeSettings = async () => {
+      try {
+        const res = await fetch("/api/settings/edit-mode")
+        if (res.ok) {
+          const data = await res.json()
+          setDefaultEditMode(data.defaultEditMode || false)
+        }
+      } catch (error) {
+        console.error("Failed to fetch edit mode settings:", error)
+        // Use default (false) if fetch fails
+        setDefaultEditMode(false)
+      }
+    }
+    loadEditModeSettings()
+
     // Fetch override description settings
     const loadOverrideDescriptionSettings = async () => {
       try {
@@ -256,7 +275,8 @@ export default function ProductSearchPage() {
       setEditedCondition(defaultCondition)
       setEditedPrice(data.price?.value || "0.00")
       setIsMeanPrice(data._searchMetadata?.isMeanPrice || false)
-      setIsEditing(false)
+      // Initialize edit mode based on user's default edit mode setting
+      setIsEditing(defaultEditMode || false)
       setListingSuccess(null) // Clear success message for new search
       
       // Fetch SKU preview for this listing
