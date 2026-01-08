@@ -837,7 +837,8 @@ export default function ProductSearchPage() {
         // Fallback to fetching from API
         fetchSkuPreview(false)
       }
-      setIsEditing(false)
+      // Keep user in edit mode after listing so they can make changes and list again
+      // setIsEditing(false) - Removed: users can now type and list directly without saving
     } catch (err: any) {
       setListingError(err.message || "Failed to list product on eBay")
     } finally {
@@ -1334,15 +1335,13 @@ export default function ProductSearchPage() {
       // List on eBay with spacebar:
       // 1. Spacebar is pressed
       // 2. Product data exists
-      // 3. Not currently editing (to avoid conflicts with text inputs)
-      // 4. Not currently listing (to avoid duplicate listings)
-      // 5. Scanner is not active
-      // 6. No aspect form is showing
-      // 7. Target is not an input, textarea, or button (to avoid conflicts)
+      // 3. Not currently listing (to avoid duplicate listings)
+      // 4. Scanner is not active
+      // 5. No aspect form is showing
+      // 6. Target is not an input, textarea, button, or select (to avoid conflicts when typing)
       if (
         e.key === " " && 
         productData && 
-        !isEditing && 
         !listingLoading && 
         !scannerActive && 
         !showAspectForm &&
@@ -1358,7 +1357,7 @@ export default function ProductSearchPage() {
     
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [productData, scannerActive, showAspectForm, isEditing, listingLoading])
+  }, [productData, scannerActive, showAspectForm, listingLoading])
 
   if (checking) {
     return (
@@ -1743,70 +1742,54 @@ export default function ProductSearchPage() {
 
                   {/* Product Details */}
                   <div className="space-y-4">
-                    {/* Edit/Save buttons */}
-                    <div className="flex justify-end gap-2 mb-4">
-                      {!isEditing ? (
-                        <button
-                          onClick={() => {
-                            // Ensure condition defaults to "Used - Very Good" if empty
-                            if (!editedCondition || editedCondition.trim() === "") {
-                              setEditedCondition("Used - Very Good")
-                            }
-                            // When entering edit mode, initialize editedDescription
-                            // If override is enabled and there's a previously saved description, use it
-                            // Otherwise, use product data description or empty if override is enabled
-                            console.log("[FRONTEND DEBUG] ========== EDIT CLICKED ==========")
-                            console.log("[FRONTEND DEBUG] Edit Clicked - Current state:", JSON.stringify({
-                              useOverrideDescription: useOverrideDescription,
-                              productDataDescription: productData.description,
-                              productDataShortDescription: productData.shortDescription,
-                              currentEditedDescription: editedDescription
-                            }, null, 2))
-                            
-                            if (useOverrideDescription) {
-                              // Check if there's a previously saved description in productData
-                              const savedDescription = productData.description || productData.shortDescription || ""
-                              console.log("[FRONTEND DEBUG] Override enabled - Loading saved description:", JSON.stringify({
-                                savedDescription: savedDescription,
-                                savedDescriptionLength: savedDescription.length,
-                                source: productData.description ? "productData.description" : (productData.shortDescription ? "productData.shortDescription" : "empty")
-                              }, null, 2))
-                              setEditedDescription(savedDescription)
-                            } else {
-                              const normalDescription = productData.shortDescription || productData.description || ""
-                              console.log("[FRONTEND DEBUG] Override disabled - Loading normal description:", normalDescription)
-                              setEditedDescription(normalDescription)
-                            }
-                            setIsEditing(true)
-                            console.log("[FRONTEND DEBUG] Edit mode enabled")
-                          }}
-                          className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors duration-200 flex items-center gap-2"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                          </svg>
-                          Edit
-                        </button>
-                      ) : (
-                        <div className="flex gap-2">
+                    {/* Edit button - Only show when default edit mode is disabled */}
+                    {!defaultEditMode && (
+                      <div className="flex justify-end gap-2 mb-4">
+                        {!isEditing && (
                           <button
-                            onClick={handleSaveEdit}
-                            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors duration-200 flex items-center gap-2"
+                            onClick={() => {
+                              // Ensure condition defaults to "Used - Very Good" if empty
+                              if (!editedCondition || editedCondition.trim() === "") {
+                                setEditedCondition("Used - Very Good")
+                              }
+                              // When entering edit mode, initialize editedDescription
+                              // If override is enabled and there's a previously saved description, use it
+                              // Otherwise, use product data description or empty if override is enabled
+                              console.log("[FRONTEND DEBUG] ========== EDIT CLICKED ==========")
+                              console.log("[FRONTEND DEBUG] Edit Clicked - Current state:", JSON.stringify({
+                                useOverrideDescription: useOverrideDescription,
+                                productDataDescription: productData.description,
+                                productDataShortDescription: productData.shortDescription,
+                                currentEditedDescription: editedDescription
+                              }, null, 2))
+                              
+                              if (useOverrideDescription) {
+                                // Check if there's a previously saved description in productData
+                                const savedDescription = productData.description || productData.shortDescription || ""
+                                console.log("[FRONTEND DEBUG] Override enabled - Loading saved description:", JSON.stringify({
+                                  savedDescription: savedDescription,
+                                  savedDescriptionLength: savedDescription.length,
+                                  source: productData.description ? "productData.description" : (productData.shortDescription ? "productData.shortDescription" : "empty")
+                                }, null, 2))
+                                setEditedDescription(savedDescription)
+                              } else {
+                                const normalDescription = productData.shortDescription || productData.description || ""
+                                console.log("[FRONTEND DEBUG] Override disabled - Loading normal description:", normalDescription)
+                                setEditedDescription(normalDescription)
+                              }
+                              setIsEditing(true)
+                              console.log("[FRONTEND DEBUG] Edit mode enabled")
+                            }}
+                            className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors duration-200 flex items-center gap-2"
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                             </svg>
-                            Save
+                            Edit
                           </button>
-                          <button
-                            onClick={handleCancelEdit}
-                            className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors duration-200"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      )}
-                    </div>
+                        )}
+                      </div>
+                    )}
 
                     {/* Title - Editable */}
                     <div>
@@ -2024,7 +2007,7 @@ export default function ProductSearchPage() {
                       {/* List on eBay Button */}
                       <button
                         onClick={() => handleListOnEbay()}
-                        disabled={listingLoading || isEditing}
+                        disabled={listingLoading}
                         className="px-6 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
                       >
                         {listingLoading ? (
