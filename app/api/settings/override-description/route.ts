@@ -25,12 +25,14 @@ export async function GET() {
         data: {
           userId: session.user.id,
           useOverrideDescription: false,
+          overrideDescription: null,
         }
       })
     }
 
     return NextResponse.json({
       useOverrideDescription: overrideSettings.useOverrideDescription,
+      overrideDescription: overrideSettings.overrideDescription || "",
     })
   } catch (error) {
     console.error("Error fetching override description settings:", error)
@@ -54,7 +56,7 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json()
-    const { useOverrideDescription } = body
+    const { useOverrideDescription, overrideDescription } = body
 
     // Validate useOverrideDescription if provided
     if (useOverrideDescription !== undefined && typeof useOverrideDescription !== 'boolean') {
@@ -64,21 +66,32 @@ export async function POST(req: Request) {
       )
     }
 
+    // Validate overrideDescription if provided
+    if (overrideDescription !== undefined && typeof overrideDescription !== 'string') {
+      return NextResponse.json(
+        { error: "overrideDescription must be a string value" },
+        { status: 400 }
+      )
+    }
+
     // Update or create settings
     const updated = await (prisma as any).overrideDescriptionSettings.upsert({
       where: { userId: session.user.id },
       update: {
         ...(useOverrideDescription !== undefined && { useOverrideDescription }),
+        ...(overrideDescription !== undefined && { overrideDescription: overrideDescription || null }),
       },
       create: {
         userId: session.user.id,
         useOverrideDescription: useOverrideDescription !== undefined ? useOverrideDescription : false,
+        overrideDescription: overrideDescription || null,
       }
     })
 
     return NextResponse.json({
       success: true,
       useOverrideDescription: updated.useOverrideDescription,
+      overrideDescription: updated.overrideDescription || "",
     })
   } catch (error) {
     console.error("Error updating override description settings:", error)

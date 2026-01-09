@@ -121,12 +121,13 @@ model DiscountSettings {
 }
 
 model OverrideDescriptionSettings {
-  id                String   @id @default(cuid())
-  userId            String   @unique
-  useOverrideDescription Boolean @default(false)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                     String   @id @default(cuid())
+  userId                 String   @unique
+  useOverrideDescription Boolean  @default(false)
+  overrideDescription    String?  // The universal default description text
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+  user                   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model EditModeSettings {

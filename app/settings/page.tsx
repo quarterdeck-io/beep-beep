@@ -56,6 +56,7 @@ export default function SettingsPage() {
 
   // Override Description Settings state
   const [useOverrideDescription, setUseOverrideDescription] = useState<boolean>(false)
+  const [overrideDescription, setOverrideDescription] = useState<string>("")
   const [loadingOverrideDescription, setLoadingOverrideDescription] = useState(false)
   const [savingOverrideDescription, setSavingOverrideDescription] = useState(false)
 
@@ -212,6 +213,7 @@ export default function SettingsPage() {
         if (res.ok) {
           const data = await res.json()
           setUseOverrideDescription(data.useOverrideDescription || false)
+          setOverrideDescription(data.overrideDescription || "")
         }
       } catch (error) {
         console.error("Failed to fetch override description settings:", error)
@@ -516,19 +518,20 @@ export default function SettingsPage() {
         },
         body: JSON.stringify({
           useOverrideDescription: useOverrideDescription,
+          overrideDescription: overrideDescription,
         }),
       })
 
       const data = await res.json()
 
       if (res.ok) {
-        setMessage({ type: "success", text: "✓ Override description setting saved successfully" })
+        setMessage({ type: "success", text: "✓ Override description settings saved successfully" })
       } else {
-        const errorMsg = data.details ? `${data.error}: ${data.details}` : (data.error || "Failed to save override description setting")
+        const errorMsg = data.details ? `${data.error}: ${data.details}` : (data.error || "Failed to save override description settings")
         setMessage({ type: "error", text: errorMsg })
       }
     } catch (error) {
-      setMessage({ type: "error", text: "Failed to save override description setting" })
+      setMessage({ type: "error", text: "Failed to save override description settings" })
     } finally {
       setSavingOverrideDescription(false)
     }
@@ -1061,10 +1064,10 @@ export default function SettingsPage() {
           {/* Override Description Settings Card */}
           <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6 mt-6">
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-              Override Description Setting
+              Universal Override Description
             </h2>
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-              When enabled, the description field on the product listing page will be labeled as "Override Description" and you can manually enter your own description for each listing.
+              Set a universal description that will automatically apply to ALL product listings. When enabled, this description replaces the default eBay product description for every item you list.
             </p>
 
             {loadingOverrideDescription ? (
@@ -1078,10 +1081,12 @@ export default function SettingsPage() {
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
                     <label className="block text-sm font-medium text-gray-900 dark:text-white mb-1">
-                      Use Override Description
+                      Enable Universal Override Description
                     </label>
                     <p className="text-xs text-gray-500 dark:text-gray-400">
-                      Enable this to replace the "Description" label with "Override Description" on the product listing page
+                      {useOverrideDescription 
+                        ? "All listings will use the override description below" 
+                        : "Listings will use the default eBay product description"}
                     </p>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">
@@ -1095,6 +1100,33 @@ export default function SettingsPage() {
                   </label>
                 </div>
 
+                {/* Override Description Text Area - only show when enabled */}
+                {useOverrideDescription && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-900 dark:text-white mb-2">
+                      Default Override Description
+                    </label>
+                    <textarea
+                      value={overrideDescription}
+                      onChange={(e) => setOverrideDescription(e.target.value)}
+                      placeholder="e.g., New in packaging. Ships in 2 days."
+                      rows={4}
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-y"
+                    />
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      This description will be automatically applied to all products when listing on eBay. You can still edit it per-product if needed.
+                    </p>
+                  </div>
+                )}
+
+                {/* Preview */}
+                {useOverrideDescription && overrideDescription && (
+                  <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                    <p className="text-sm font-medium text-blue-800 dark:text-blue-300 mb-2">Preview:</p>
+                    <p className="text-sm text-blue-700 dark:text-blue-400 whitespace-pre-wrap">{overrideDescription}</p>
+                  </div>
+                )}
+
                 {/* Save Button */}
                 <div className="pt-4">
                   <button
@@ -1102,7 +1134,7 @@ export default function SettingsPage() {
                     disabled={savingOverrideDescription}
                     className="px-6 py-2 bg-gray-800 dark:bg-gray-700 text-white rounded-md hover:bg-gray-700 dark:hover:bg-gray-600 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {savingOverrideDescription ? "Saving..." : "Save Override Description Setting"}
+                    {savingOverrideDescription ? "Saving..." : "Save Override Description Settings"}
                   </button>
                 </div>
               </div>

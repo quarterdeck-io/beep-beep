@@ -83,6 +83,7 @@ export default function ProductSearchPage() {
   
   // Override description settings state
   const [useOverrideDescription, setUseOverrideDescription] = useState<boolean>(false)
+  const [universalOverrideDescription, setUniversalOverrideDescription] = useState<string>("")
   
   // Available conditions for dropdown
   const conditions = [
@@ -219,11 +220,17 @@ export default function ProductSearchPage() {
         if (res.ok) {
           const data = await res.json()
           setUseOverrideDescription(data.useOverrideDescription || false)
+          setUniversalOverrideDescription(data.overrideDescription || "")
+          console.log("[OVERRIDE DEBUG] Loaded settings:", {
+            useOverrideDescription: data.useOverrideDescription,
+            overrideDescription: data.overrideDescription
+          })
         }
       } catch (error) {
         console.error("Failed to fetch override description settings:", error)
         // Use default if fetch fails
         setUseOverrideDescription(false)
+        setUniversalOverrideDescription("")
       }
     }
     loadOverrideDescriptionSettings()
@@ -617,27 +624,40 @@ export default function ProductSearchPage() {
         productDataDescriptionLength: productData.description ? productData.description.length : 0
       }, null, 2))
       
-      const descriptionToSend = useOverrideDescription 
-        ? (editedDescription && editedDescription.trim().length > 0 
-            ? editedDescription  // Override mode: use what user typed if not empty
-            : (productData.shortDescription || productData.description || ""))  // Fallback to eBay description if override is empty
-        : (editedDescription || productData.shortDescription || productData.description || "")  // Normal mode: use edited or fall back to product data
+      // Description logic:
+      // 1. If useOverrideDescription is enabled and universalOverrideDescription is set, use that
+      // 2. If user manually edited the description (editedDescription), use that
+      // 3. Otherwise, fall back to eBay product description
+      let descriptionToSend: string
+      let descriptionSource: string
+      
+      if (useOverrideDescription && universalOverrideDescription && universalOverrideDescription.trim().length > 0) {
+        // Universal override is enabled and has content - use it
+        descriptionToSend = universalOverrideDescription
+        descriptionSource = "UNIVERSAL_OVERRIDE"
+      } else if (editedDescription && editedDescription.trim().length > 0) {
+        // User manually edited the description - use that
+        descriptionToSend = editedDescription
+        descriptionSource = "USER_EDITED"
+      } else {
+        // Fall back to eBay product description
+        descriptionToSend = productData.shortDescription || productData.description || ""
+        descriptionSource = "EBAY_DEFAULT"
+      }
       
       console.log("[FRONTEND DEBUG] Listing to eBay - Final Description Decision:", JSON.stringify({
         useOverrideDescription: useOverrideDescription,
+        universalOverrideDescription: universalOverrideDescription,
+        universalOverrideDescriptionLength: universalOverrideDescription ? universalOverrideDescription.length : 0,
         editedDescription: editedDescription,
         editedDescriptionLength: editedDescription ? editedDescription.length : 0,
-        editedDescriptionPreview: editedDescription ? editedDescription.substring(0, 100) : "empty",
         productDataShortDescription: productData.shortDescription,
         productDataDescription: productData.description,
         descriptionToSend: descriptionToSend,
         descriptionToSendPreview: descriptionToSend ? descriptionToSend.substring(0, 100) : "empty",
         descriptionLength: descriptionToSend.length,
         isEmpty: !descriptionToSend || descriptionToSend.trim().length === 0,
-        usedFallback: useOverrideDescription && (!editedDescription || editedDescription.trim().length === 0),
-        decision: useOverrideDescription 
-          ? (editedDescription && editedDescription.trim().length > 0 ? "USED_OVERRIDE" : "USED_FALLBACK")
-          : (editedDescription ? "USED_EDITED" : "USED_PRODUCT_DATA")
+        descriptionSource: descriptionSource
       }, null, 2))
 
       const response = await fetch("/api/ebay/list", {
@@ -1812,34 +1832,25 @@ export default function ProductSearchPage() {
                     </div>
 
                     {/* Description - Editable */}
-                    {/* When override is enabled, only show in edit mode. When disabled, show in both view and edit mode */}
-                    {useOverrideDescription ? (
-                      // Override Description mode: only show when editing
-                      isEditing && (
-                        <div>
-                          <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">
-                            Override Description
-                          </h3>
-                          <textarea
-                            value={editedDescription}
-                            onChange={(e) => {
-                              const newValue = e.target.value
-                              console.log("[FRONTEND DEBUG] Override Description field changed:", JSON.stringify({
-                                oldValue: editedDescription,
-                                oldValueLength: editedDescription ? editedDescription.length : 0,
-                                newValue: newValue,
-                                newValueLength: newValue.length,
-                                isTyping: newValue.length > (editedDescription?.length || 0),
-                                newValuePreview: newValue.substring(0, 50)
-                              }, null, 2))
-                              setEditedDescription(newValue)
-                            }}
-                            rows={4}
-                            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                            placeholder="Enter product description"
-                          />
+                    {/* When universal override is enabled and has content, show it. Otherwise show normal description */}
+                    {useOverrideDescription && universalOverrideDescription && universalOverrideDescription.trim().length > 0 ? (
+                      // Universal Override Description mode: show the universal description from settings
+                      <div>
+                        <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">
+                          Description
+                          <span className="ml-2 text-xs font-normal text-green-600 dark:text-green-400">
+                            (Universal Override Applied)
+                          </span>
+                        </h3>
+                        <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                          <p className="text-gray-900 dark:text-white whitespace-pre-wrap">
+                            {universalOverrideDescription}
+                          </p>
                         </div>
-                      )
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                          This description is set in Settings and applies to all listings automatically.
+                        </p>
+                      </div>
                     ) : (
                       // Normal Description mode: show in both view and edit mode
                       <div>
