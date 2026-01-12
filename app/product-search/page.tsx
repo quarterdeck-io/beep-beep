@@ -75,8 +75,12 @@ export default function ProductSearchPage() {
   const [isMeanPrice, setIsMeanPrice] = useState(false)
   
   // Discount settings state
-  const [discountPercentage, setDiscountPercentage] = useState<number>(30)
+  const [discountAmount, setDiscountAmount] = useState<number>(3.0)
   const [minimumPrice, setMinimumPrice] = useState<number>(4.0)
+  
+  // Floor warning dialog state
+  const [showFloorWarning, setShowFloorWarning] = useState(false)
+  const [floorWarningData, setFloorWarningData] = useState<{ original: number; discounted: number; floor: number } | null>(null)
   
   // Edit mode settings state
   const [defaultEditMode, setDefaultEditMode] = useState<boolean>(false)
@@ -124,28 +128,37 @@ export default function ProductSearchPage() {
   }
   
   // Helper function to calculate discounted price with minimum floor
-  const calculateDiscountedPrice = (originalPrice: string | number): { original: number; discounted: number; discountAmount: number; discountPercent: number } => {
+  const calculateDiscountedPrice = (originalPrice: string | number): { 
+    original: number; 
+    discounted: number; 
+    actualDiscount: number; 
+    hitFloor: boolean;
+    rawDiscounted: number;
+  } => {
     const original = typeof originalPrice === 'string' ? parseFloat(originalPrice) || 0 : originalPrice
     
     // Use settings values (with defaults if not loaded yet)
-    const discountPercent = discountPercentage || 30
+    const discount = discountAmount || 3.0
     const minPrice = minimumPrice || 4.0
     
-    // Calculate discounted price
-    const discounted = original * (1 - discountPercent / 100)
+    // Calculate discounted price (subtract fixed USD amount)
+    const rawDiscounted = original - discount
+    
+    // Check if it hits the floor
+    const hitFloor = rawDiscounted < minPrice
     
     // Apply minimum price floor
-    const finalPrice = Math.max(discounted, minPrice)
+    const finalPrice = Math.max(rawDiscounted, minPrice)
     
-    // Calculate actual discount amount (may be less than configured % if minimum floor applies)
-    const actualDiscountAmount = original - finalPrice
-    const actualDiscountPercent = original > 0 ? (actualDiscountAmount / original) * 100 : 0
+    // Calculate actual discount amount (may be less than configured if minimum floor applies)
+    const actualDiscount = original - finalPrice
     
     return {
       original,
       discounted: finalPrice,
-      discountAmount: actualDiscountAmount,
-      discountPercent: actualDiscountPercent
+      actualDiscount,
+      hitFloor,
+      rawDiscounted
     }
   }
   
@@ -185,13 +198,13 @@ export default function ProductSearchPage() {
         const res = await fetch("/api/settings/discount")
         if (res.ok) {
           const data = await res.json()
-          setDiscountPercentage(data.discountPercentage || 30)
+          setDiscountAmount(data.discountAmount || 3.0)
           setMinimumPrice(data.minimumPrice || 4.0)
         }
       } catch (error) {
         console.error("Failed to fetch discount settings:", error)
         // Use defaults if fetch fails
-        setDiscountPercentage(30)
+        setDiscountAmount(3.0)
         setMinimumPrice(4.0)
       }
     }
@@ -521,8 +534,23 @@ export default function ProductSearchPage() {
     }
   }
   
-  const handleListOnEbay = async (additionalAspects?: Record<string, string>) => {
+  const handleListOnEbay = async (additionalAspects?: Record<string, string>, bypassFloorWarning?: boolean) => {
     if (!productData) return
+    
+    // Check if price hits floor and show warning dialog (unless bypassed)
+    const listingPrice = editedPrice || productData.price?.value || "0.00"
+    const priceInfo = calculateDiscountedPrice(listingPrice)
+    
+    if (priceInfo.hitFloor && !bypassFloorWarning) {
+      // Show floor warning dialog
+      setFloorWarningData({
+        original: priceInfo.original,
+        discounted: priceInfo.discounted,
+        floor: minimumPrice
+      })
+      setShowFloorWarning(true)
+      return
+    }
     
     setListingLoading(true)
     setListingError(null)
@@ -1506,6 +1534,96 @@ export default function ProductSearchPage() {
               </div>
             )}
 
+            {/* Floor Warning Dialog Modal */}
+            {showFloorWarning && floorWarningData && (
+              <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+                <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full shadow-xl">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="flex-shrink-0 w-12 h-12 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center">
+                      <svg className="w-6 h-6 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                        Price Hit Floor - Reject Item?
+                      </h3>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        This item's price is below the minimum threshold
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4 mb-6">
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-400">Original Price:</span>
+                        <span className="font-medium text-gray-900 dark:text-white">${floorWarningData.original.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-400">After ${discountAmount.toFixed(2)} Discount:</span>
+                        <span className="font-medium text-red-600 dark:text-red-400 line-through">${(floorWarningData.original - discountAmount).toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-400">Minimum Floor:</span>
+                        <span className="font-medium text-amber-600 dark:text-amber-400">${floorWarningData.floor.toFixed(2)}</span>
+                      </div>
+                      <hr className="border-amber-200 dark:border-amber-700" />
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-400">Final List Price:</span>
+                        <span className="font-bold text-amber-600 dark:text-amber-400">${floorWarningData.discounted.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+                    The discounted price (${(floorWarningData.original - discountAmount).toFixed(2)}) is below your minimum floor (${floorWarningData.floor.toFixed(2)}). 
+                    <strong className="text-amber-700 dark:text-amber-300"> Consider rejecting this item</strong> or proceed with the floor price.
+                  </p>
+                  
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => {
+                        setShowFloorWarning(false)
+                        setFloorWarningData(null)
+                        // Clear the product to "reject" it
+                        setProductData(null)
+                        setUpc("")
+                        setEditedTitle("")
+                        setEditedDescription("")
+                        setEditedCondition("")
+                        setEditedPrice("")
+                      }}
+                      className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-colors"
+                    >
+                      Reject Item
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowFloorWarning(false)
+                        setFloorWarningData(null)
+                        // Proceed with listing at floor price
+                        handleListOnEbay(undefined, true)
+                      }}
+                      className="flex-1 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-lg transition-colors"
+                    >
+                      List at ${floorWarningData.discounted.toFixed(2)}
+                    </button>
+                  </div>
+                  
+                  <button
+                    onClick={() => {
+                      setShowFloorWarning(false)
+                      setFloorWarningData(null)
+                    }}
+                    className="w-full mt-3 px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 font-medium rounded-lg transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Barcode Scanner Modal */}
             {scannerActive && (
               <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
@@ -1832,7 +1950,7 @@ export default function ProductSearchPage() {
                           </h3>
                           {isEditing ? (
                             <div className="space-y-2">
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2 flex-wrap">
                                 <span className="text-gray-600 dark:text-gray-400 text-sm">{currency}</span>
                                 <input
                                   type="number"
@@ -1846,30 +1964,54 @@ export default function ProductSearchPage() {
                                 {currentPrice > 0 && (
                                   <div className="flex items-center gap-2">
                                     <span className="text-gray-400">→</span>
-                                    <span className="text-lg font-bold text-green-600 dark:text-green-400">
+                                    <span className={`text-lg font-bold ${priceInfo.hitFloor ? 'text-amber-600 dark:text-amber-400' : 'text-green-600 dark:text-green-400'}`}>
                                       {currency} {priceInfo.discounted.toFixed(2)}
                                     </span>
                                     <span className="text-xs text-red-600 dark:text-red-400">
-                                      ({priceInfo.discountPercent.toFixed(1)}% off)
+                                      (-${discountAmount.toFixed(2)})
                                     </span>
                                   </div>
                                 )}
                               </div>
+                              {/* Floor Warning in Edit Mode */}
+                              {priceInfo.hitFloor && currentPrice > 0 && (
+                                <div className="flex items-center gap-2 p-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                                  <svg className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                  </svg>
+                                  <span className="text-sm text-amber-700 dark:text-amber-300">
+                                    <strong>Price hit floor!</strong> Would be ${priceInfo.rawDiscounted.toFixed(2)}, using minimum ${minimumPrice.toFixed(2)}. Consider rejecting.
+                                  </span>
+                                </div>
+                              )}
                             </div>
                           ) : (
-                            <div className="flex items-center gap-2 flex-wrap">
-                              {priceInfo.original > priceInfo.discounted && (
-                                <span className="text-sm text-gray-500 dark:text-gray-400 line-through">
-                                  {currency} {priceInfo.original.toFixed(2)}
+                            <div className="space-y-2">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                {priceInfo.original > priceInfo.discounted && (
+                                  <span className="text-sm text-gray-500 dark:text-gray-400 line-through">
+                                    {currency} {priceInfo.original.toFixed(2)}
+                                  </span>
+                                )}
+                                <span className={`text-xl font-bold ${priceInfo.hitFloor ? 'text-amber-600 dark:text-amber-400' : 'text-green-600 dark:text-green-400'}`}>
+                                  {currency} {priceInfo.discounted.toFixed(2)}
                                 </span>
-                              )}
-                              <span className="text-xl font-bold text-green-600 dark:text-green-400">
-                                {currency} {priceInfo.discounted.toFixed(2)}
-                              </span>
-                              {priceInfo.original > priceInfo.discounted && (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300">
-                                  Save {currency} {priceInfo.discountAmount.toFixed(2)} ({priceInfo.discountPercent.toFixed(1)}%)
-                                </span>
+                                {priceInfo.original > priceInfo.discounted && (
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300">
+                                    Save {currency} {priceInfo.actualDiscount.toFixed(2)}
+                                  </span>
+                                )}
+                              </div>
+                              {/* Floor Warning in View Mode */}
+                              {priceInfo.hitFloor && (
+                                <div className="flex items-center gap-2 p-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                                  <svg className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                  </svg>
+                                  <span className="text-sm text-amber-700 dark:text-amber-300">
+                                    <strong>Price hit floor!</strong> Consider rejecting this item.
+                                  </span>
+                                </div>
                               )}
                             </div>
                           )}

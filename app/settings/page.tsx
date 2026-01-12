@@ -44,7 +44,7 @@ export default function SettingsPage() {
   const [deletingKeyword, setDeletingKeyword] = useState<string | null>(null)
 
   // Discount Settings state
-  const [discountPercentage, setDiscountPercentage] = useState<number>(30)
+  const [discountAmount, setDiscountAmount] = useState<number>(3.0)
   const [minimumPrice, setMinimumPrice] = useState<number>(4.0)
   const [loadingDiscount, setLoadingDiscount] = useState(false)
   const [savingDiscount, setSavingDiscount] = useState(false)
@@ -171,7 +171,7 @@ export default function SettingsPage() {
         const res = await fetch("/api/settings/discount")
         if (res.ok) {
           const data = await res.json()
-          setDiscountPercentage(data.discountPercentage || 30)
+          setDiscountAmount(data.discountAmount || 3.0)
           setMinimumPrice(data.minimumPrice || 4.0)
         }
       } catch (error) {
@@ -456,7 +456,7 @@ export default function SettingsPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          discountPercentage: discountPercentage,
+          discountAmount: discountAmount,
           minimumPrice: minimumPrice,
         }),
       })
@@ -940,7 +940,7 @@ export default function SettingsPage() {
               Discount Settings
             </h2>
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-              Configure discount percentage and minimum price for product listings. The discount will be applied to product prices, but the final price will never go below the minimum price.
+              Configure discount amount (in USD) and minimum price for product listings. The discount will be subtracted from product prices. If the discounted price falls below the minimum, a warning will be shown suggesting to reject the item.
             </p>
 
             {loadingDiscount ? (
@@ -950,41 +950,64 @@ export default function SettingsPage() {
               </div>
             ) : (
               <div className="space-y-6">
-                {/* Discount Percentage */}
+                {/* Discount Amount */}
                 <div>
                   <label className="block text-sm font-medium text-gray-900 dark:text-white mb-2">
-                    Discount Percentage (%)
+                    Discount Amount (USD)
                   </label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    min="0"
-                    value={discountPercentage}
-                    onChange={(e) => setDiscountPercentage(parseFloat(e.target.value) || 0)}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="30"
-                  />
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400">$</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={discountAmount}
+                      onChange={(e) => setDiscountAmount(parseFloat(e.target.value) || 0)}
+                      className="w-full pl-7 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="3.00"
+                    />
+                  </div>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    The percentage discount to apply to product prices (e.g., 30 for 30% off)
+                    The fixed dollar amount to subtract from product prices (e.g., $3 discount)
                   </p>
                 </div>
 
                 {/* Minimum Price */}
                 <div>
                   <label className="block text-sm font-medium text-gray-900 dark:text-white mb-2">
-                    Minimum Price (USD)
+                    Minimum Price Floor (USD)
                   </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={minimumPrice}
-                    onChange={(e) => setMinimumPrice(parseFloat(e.target.value) || 0)}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="4.00"
-                  />
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400">$</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={minimumPrice}
+                      onChange={(e) => setMinimumPrice(parseFloat(e.target.value) || 0)}
+                      className="w-full pl-7 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="4.00"
+                    />
+                  </div>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    The minimum price floor. If the discounted price falls below this value, the minimum price will be used instead.
+                    The minimum price floor. If the discounted price falls below this value, a warning will be displayed suggesting to reject the item.
+                  </p>
+                </div>
+
+                {/* Example Preview */}
+                <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                  <p className="text-sm font-medium text-blue-800 dark:text-blue-300 mb-2">Example:</p>
+                  <p className="text-sm text-blue-700 dark:text-blue-400">
+                    Original price: $10.00 → After ${discountAmount.toFixed(2)} discount → <strong>${Math.max(10 - discountAmount, minimumPrice).toFixed(2)}</strong>
+                    {10 - discountAmount < minimumPrice && (
+                      <span className="ml-2 text-amber-600 dark:text-amber-400">(floor applied)</span>
+                    )}
+                  </p>
+                  <p className="text-sm text-blue-700 dark:text-blue-400 mt-1">
+                    Original price: $5.00 → After ${discountAmount.toFixed(2)} discount → <strong>${Math.max(5 - discountAmount, minimumPrice).toFixed(2)}</strong>
+                    {5 - discountAmount < minimumPrice && (
+                      <span className="ml-2 text-amber-600 dark:text-amber-400">(floor applied - reject warning)</span>
+                    )}
                   </p>
                 </div>
 

@@ -24,14 +24,14 @@ export async function GET() {
       discountSettings = await (prisma as any).discountSettings.create({
         data: {
           userId: session.user.id,
-          discountPercentage: 30.0,
+          discountAmount: 3.0,
           minimumPrice: 4.0,
         }
       })
     }
 
     return NextResponse.json({
-      discountPercentage: discountSettings.discountPercentage,
+      discountAmount: discountSettings.discountAmount,
       minimumPrice: discountSettings.minimumPrice,
     })
   } catch (error) {
@@ -56,14 +56,20 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json()
-    const { discountPercentage, minimumPrice } = body
+    const { discountAmount, minimumPrice } = body
 
-    // Validate discountPercentage if provided
-    if (discountPercentage !== undefined) {
-      const percentage = parseFloat(discountPercentage)
-      if (isNaN(percentage)) {
+    // Validate discountAmount if provided
+    if (discountAmount !== undefined) {
+      const amount = parseFloat(discountAmount)
+      if (isNaN(amount)) {
         return NextResponse.json(
-          { error: "Discount percentage must be a valid number" },
+          { error: "Discount amount must be a valid number" },
+          { status: 400 }
+        )
+      }
+      if (amount < 0) {
+        return NextResponse.json(
+          { error: "Discount amount cannot be negative" },
           { status: 400 }
         )
       }
@@ -78,25 +84,31 @@ export async function POST(req: Request) {
           { status: 400 }
         )
       }
+      if (minPrice < 0) {
+        return NextResponse.json(
+          { error: "Minimum price cannot be negative" },
+          { status: 400 }
+        )
+      }
     }
 
     // Update or create settings
     const updated = await (prisma as any).discountSettings.upsert({
       where: { userId: session.user.id },
       update: {
-        ...(discountPercentage !== undefined && { discountPercentage: parseFloat(discountPercentage) }),
+        ...(discountAmount !== undefined && { discountAmount: parseFloat(discountAmount) }),
         ...(minimumPrice !== undefined && { minimumPrice: parseFloat(minimumPrice) }),
       },
       create: {
         userId: session.user.id,
-        discountPercentage: discountPercentage !== undefined ? parseFloat(discountPercentage) : 30.0,
+        discountAmount: discountAmount !== undefined ? parseFloat(discountAmount) : 3.0,
         minimumPrice: minimumPrice !== undefined ? parseFloat(minimumPrice) : 4.0,
       }
     })
 
     return NextResponse.json({
       success: true,
-      discountPercentage: updated.discountPercentage,
+      discountAmount: updated.discountAmount,
       minimumPrice: updated.minimumPrice,
     })
   } catch (error) {
