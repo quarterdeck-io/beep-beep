@@ -1441,31 +1441,21 @@ export default function ProductSearchPage() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <Navigation />
-      <div className="max-w-6xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="px-4 py-6 sm:px-0">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-6">
-            Product Search
-          </h1>
-
-          <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6 mb-6">
-            <form onSubmit={handleSearch} className="space-y-4">
-              <div>
-                <label
-                  htmlFor="upc"
-                  className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
-                >
-                  Enter UPC Code
-                </label>
-                <div className="flex gap-4">
-                  <input
-                    id="upc"
-                    type="text"
-                    value={upc}
-                    onChange={(e) => setUpc(e.target.value)}
-                    placeholder="e.g., 885909950805"
-                    className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                    required
-                  />
+      <div className="max-w-7xl mx-auto py-3 sm:px-6 lg:px-8">
+        <div className="px-4 py-3 sm:px-0">
+          {/* Search Bar - Compact */}
+          <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-4 mb-4">
+            <form onSubmit={handleSearch}>
+              <div className="flex gap-3">
+                <input
+                  id="upc"
+                  type="text"
+                  value={upc}
+                  onChange={(e) => setUpc(e.target.value)}
+                  placeholder="Enter UPC Code (e.g., 885909950805)"
+                  className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  required
+                />
                   <button
                     type="submit"
                     disabled={loading}
@@ -1495,7 +1485,6 @@ export default function ProductSearchPage() {
                     )}
                   </button>
                 </div>
-              </div>
             </form>
 
             {error && (
@@ -1581,159 +1570,115 @@ export default function ProductSearchPage() {
             )}
           </div>
           
-          {/* Duplicate Checking Notice */}
-          {checkingDuplicates && productData && (
-            <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-300 dark:border-blue-700 rounded-lg">
-              <div className="flex items-center gap-2">
-                <svg className="animate-spin h-4 w-4 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                <p className="text-sm text-blue-700 dark:text-blue-300">
-                  Checking for duplicates from your connected eBay account...
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Duplicate Warning Banner */}
-          {hasDuplicates && productData && duplicateSku && (
-            <div className="mt-4 mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-700 rounded-lg">
-              <div className="flex-1">
-                <h3 className="text-base font-bold text-red-700 dark:text-red-400 mb-2">
-                  Duplicate Notice
-                </h3>
-                <div className="bg-white dark:bg-gray-800 p-3 rounded-lg border border-red-200 dark:border-red-800 mb-2">
-                  <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                    Existing Listing SKU:
-                  </p>
-                  <p className="text-lg font-bold text-red-700 dark:text-red-400 font-mono">
-                    {duplicateSku}
-                  </p>
-                </div>
-                <p className="text-xs text-red-600 dark:text-red-300 mb-3">
-                  <span className="font-semibold">UPC:</span> <span className="font-mono font-semibold">{duplicateUpc || upc}</span> - This product is already listed in your eBay inventory.
-                </p>
-                {inventoryMessage && (
-                  <div className={`mb-3 p-2 rounded text-xs ${
-                    inventoryMessage.type === "success"
-                      ? "bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300"
-                      : "bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300"
-                  }`}>
-                    {inventoryMessage.text}
-                  </div>
-                )}
-                <button
-                  onClick={handleIncreaseInventory}
-                  disabled={increasingInventory}
-                  className="w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-600 flex items-center justify-center gap-2 shadow-md hover:shadow-lg active:scale-[0.98]"
-                >
-                  {increasingInventory ? (
-                    <>
-                      <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      <span>Increasing...</span>
-                    </>
-                  ) : (
-                    <span>Increase existing product inventory by 1</span>
-                  )}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* No Duplicates Found Message */}
-          {!hasDuplicates && duplicateCheckComplete && productData && (
-            <div className="mt-4 mb-4 p-4 bg-green-50 dark:bg-green-900/20 border border-green-300 dark:border-green-700 rounded-lg">
-              <div className="flex items-center gap-3">
-                <svg className="w-6 h-6 text-green-600 dark:text-green-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <div className="flex-1">
-                  <h3 className="text-base font-bold text-green-700 dark:text-green-400 mb-1">
-                    No Duplicates Found
-                  </h3>
-                  <p className="text-sm text-green-600 dark:text-green-300">
-                    <span className="font-semibold">UPC:</span> <span className="font-mono font-semibold">{upc}</span> - This product is not in your eBay inventory. You can proceed to list it.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-          
           {/* Show product details */}
           {productData && (
             <>
-              {/* Previously Listed SKU - Show when exists */}
-              <div className="flex gap-3.5">
-                {listedSku && (
-                  <div className="mb-6">
-                    <div className="p-4 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border border-green-300 dark:border-green-700 rounded-lg w-96">
-                      <h3 className="text-sm font-medium text-green-900 dark:text-green-300 mb-2">
-                        Previous SKU Number
-                      </h3>
-                      <p className="text-2xl font-bold text-green-700 dark:text-green-400 font-mono">
-                        {listedSku}
+              {/* Three boxes in one row: Duplicate Notice + Previous SKU + SKU Preview */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 mb-4">
+                {/* Duplicate Notice / No Duplicates Box */}
+                <div className="flex-1">
+                  {checkingDuplicates ? (
+                    <div className="h-full p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-300 dark:border-blue-700 rounded-lg flex items-center gap-2">
+                      <svg className="animate-spin h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      <p className="text-sm text-blue-700 dark:text-blue-300">Checking duplicates...</p>
+                    </div>
+                  ) : hasDuplicates && duplicateSku ? (
+                    <div className="h-full p-3 bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-700 rounded-lg">
+                      <h3 className="text-sm font-bold text-red-700 dark:text-red-400 mb-1">Duplicate Notice</h3>
+                      <div className="bg-white dark:bg-gray-800 p-2 rounded border border-red-200 dark:border-red-800 mb-2">
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Existing Listing SKU:</p>
+                        <p className="text-lg font-bold text-red-700 dark:text-red-400 font-mono">{duplicateSku}</p>
+                      </div>
+                      <p className="text-xs text-red-600 dark:text-red-300 mb-2">
+                        <span className="font-semibold">UPC:</span> <span className="font-mono">{duplicateUpc || upc}</span> - This product is already listed in your eBay inventory.
                       </p>
-                      <p className="text-xs text-green-600 dark:text-green-400 mt-2">
-                        This SKU was assigned to your last listed product
+                      {inventoryMessage && (
+                        <div className={`mb-2 p-2 rounded text-xs ${
+                          inventoryMessage.type === "success"
+                            ? "bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300"
+                            : "bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300"
+                        }`}>
+                          {inventoryMessage.text}
+                        </div>
+                      )}
+                      <button
+                        onClick={handleIncreaseInventory}
+                        disabled={increasingInventory}
+                        className="w-full px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                      >
+                        {increasingInventory ? (
+                          <>
+                            <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <span>Increasing...</span>
+                          </>
+                        ) : (
+                          <span>Increase existing product inventory by 1</span>
+                        )}
+                      </button>
+                    </div>
+                  ) : duplicateCheckComplete ? (
+                    <div className="h-full p-3 bg-green-50 dark:bg-green-900/20 border border-green-300 dark:border-green-700 rounded-lg">
+                      <div className="flex items-center gap-2 mb-1">
+                        <svg className="w-5 h-5 text-green-600 dark:text-green-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <h3 className="text-sm font-bold text-green-700 dark:text-green-400">No Duplicates Found</h3>
+                      </div>
+                      <p className="text-xs text-green-600 dark:text-green-300">
+                        <span className="font-semibold">UPC:</span> <span className="font-mono">{upc}</span> - This product is not in your eBay inventory. You can proceed to list it.
                       </p>
                     </div>
-                  </div>
-                )}
-                
-                {/* SKU Preview */}
-                <div className="mb-6">
-                  <div className="p-4 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border border-purple-200 dark:border-purple-700 rounded-lg w-96">
-                    <h3 className="text-sm font-medium text-purple-900 dark:text-purple-300 mb-2">
-                      SKU Preview
-                    </h3>
-                    {loadingSku ? (
-                      <p className="text-sm text-purple-600 dark:text-purple-400">Loading...</p>
-                    ) : skuPreview ? (
-                      <p className="text-2xl font-bold text-purple-700 dark:text-purple-400 font-mono">
-                        {skuPreview}
-                      </p>
-                    ) : (
-                      <p className="text-sm text-purple-600 dark:text-purple-400">No SKU available</p>
-                    )}
-                    <p className="text-xs text-purple-600 dark:text-purple-400 mt-2">
-                      This SKU will be assigned when you list this product
+                  ) : (
+                    <div className="h-full p-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg flex items-center justify-center">
+                      <p className="text-sm text-gray-500 dark:text-gray-400">Duplicate status pending...</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Previous SKU Box */}
+                <div className="p-3 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border border-green-300 dark:border-green-700 rounded-lg">
+                  <h3 className="text-xs font-medium text-green-900 dark:text-green-300 mb-1">Previous SKU Number</h3>
+                  <p className="text-xl font-bold text-green-700 dark:text-green-400 font-mono">
+                    {listedSku || "—"}
+                  </p>
+                  <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                    {listedSku ? "This SKU was assigned to your last listed product" : "No previous listing"}
+                  </p>
+                </div>
+
+                {/* SKU Preview Box */}
+                <div className="p-3 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border border-purple-200 dark:border-purple-700 rounded-lg">
+                  <h3 className="text-xs font-medium text-purple-900 dark:text-purple-300 mb-1">SKU Preview</h3>
+                  {loadingSku ? (
+                    <p className="text-sm text-purple-600 dark:text-purple-400">Loading...</p>
+                  ) : (
+                    <p className="text-xl font-bold text-purple-700 dark:text-purple-400 font-mono">
+                      {skuPreview || "—"}
                     </p>
-                  </div>
+                  )}
+                  <p className="text-xs text-purple-600 dark:text-purple-400 mt-1">
+                    This SKU will be assigned when you list this product
+                  </p>
                 </div>
               </div>
 
-              {/* Keyboard Shortcut Hint */}
-              <div className="flex items-center gap-2 mb-4 text-sm text-gray-600 dark:text-gray-400 justify-center">
-                <svg className="w-4 h-4 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
-                </svg>
-                <span>Use</span>
-                <kbd className="px-2 py-1 text-xs font-semibold text-gray-800 bg-gray-100 border border-gray-200 rounded-lg dark:bg-gray-700 dark:text-gray-100 dark:border-gray-600">Space</kbd>
-                <span>to confirm or</span>
-                <kbd className="px-2 py-1 text-xs font-semibold text-gray-800 bg-gray-100 border border-gray-200 rounded-lg dark:bg-gray-700 dark:text-gray-100 dark:border-gray-600">Escape</kbd>
-                <span>to cancel</span>
-              </div>
-
+              {/* Main Product Content - Two Column Layout */}
               <div className="bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden">
-              <div className="p-6">
-                <div className="mb-4">
-                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-                    Product Information
-                  </h2>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="p-4">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   {/* Product Image */}
                   {productData.image?.imageUrl && (
                     <div className="relative">
                       <img
                         src={productData.image.imageUrl}
                         alt={productData.title || "Product"}
-                        className="w-full h-auto rounded-lg shadow"
+                        className="w-full h-auto max-h-[320px] object-contain rounded-lg shadow bg-gray-100 dark:bg-gray-900"
                         data-image-source={productData._imageSources?.source || "unknown"}
                         data-stock-image-url={productData._imageSources?.stockImage?.imageUrl || ""}
                         data-seller-image-url={productData._imageSources?.sellerImage?.imageUrl || ""}
@@ -1761,10 +1706,10 @@ export default function ProductSearchPage() {
                   )}
 
                   {/* Product Details */}
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     {/* Edit button - Only show when default edit mode is disabled */}
                     {!defaultEditMode && (
-                      <div className="flex justify-end gap-2 mb-4">
+                      <div className="flex justify-end gap-2">
                         {!isEditing && (
                           <button
                             onClick={() => {
@@ -1813,19 +1758,17 @@ export default function ProductSearchPage() {
 
                     {/* Title - Editable */}
                     <div>
-                      <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">
-                        Title
-                      </h3>
+                      <h3 className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Title</h3>
                       {isEditing ? (
                         <input
                           type="text"
                           value={editedTitle}
                           onChange={(e) => setEditedTitle(e.target.value)}
-                          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-lg"
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                           placeholder="Enter product title"
                         />
                       ) : (
-                        <p className="mt-1 text-lg text-gray-900 dark:text-white">
+                        <p className="text-gray-900 dark:text-white">
                           {productData.title ? removeKeywords(productData.title, bannedKeywords) : "No title"}
                         </p>
                       )}
@@ -1836,37 +1779,35 @@ export default function ProductSearchPage() {
                     {useOverrideDescription && universalOverrideDescription && universalOverrideDescription.trim().length > 0 ? (
                       // Universal Override Description mode: show the universal description from settings
                       <div>
-                        <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">
+                        <h3 className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
                           Description
                           <span className="ml-2 text-xs font-normal text-green-600 dark:text-green-400">
                             (Universal Override Applied)
                           </span>
                         </h3>
-                        <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-                          <p className="text-gray-900 dark:text-white whitespace-pre-wrap">
+                        <div className="p-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                          <p className="text-sm text-gray-900 dark:text-white whitespace-pre-wrap">
                             {universalOverrideDescription}
                           </p>
                         </div>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                           This description is set in Settings and applies to all listings automatically.
                         </p>
                       </div>
                     ) : (
                       // Normal Description mode: show in both view and edit mode
                       <div>
-                        <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">
-                          Description
-                        </h3>
+                        <h3 className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Description</h3>
                         {isEditing ? (
                           <textarea
                             value={editedDescription}
                             onChange={(e) => setEditedDescription(e.target.value)}
-                            rows={4}
-                            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                            rows={2}
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
                             placeholder="Enter product description"
                           />
                         ) : (
-                          <p className="mt-1 text-gray-900 dark:text-white whitespace-pre-wrap">
+                          <p className="text-sm text-gray-900 dark:text-white whitespace-pre-wrap">
                             {productData.shortDescription || productData.description || "No description"}
                           </p>
                         )}
@@ -1881,81 +1822,54 @@ export default function ProductSearchPage() {
                       
                       return (
                         <div>
-                          <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">
+                          <h3 className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
                             Price
                             {isMeanPrice && (
-                              <span className="block text-xs text-blue-600 dark:text-blue-400 mt-1 font-normal">
-                                This is the mean price of latest 10 listing
+                              <span className="ml-2 text-xs text-blue-600 dark:text-blue-400 font-normal">
+                                (mean price of latest 10 listings)
                               </span>
                             )}
                           </h3>
                           {isEditing ? (
-                            <div className="space-y-3">
+                            <div className="space-y-2">
                               <div className="flex items-center gap-2">
-                                <span className="text-gray-600 dark:text-gray-400">{currency}</span>
+                                <span className="text-gray-600 dark:text-gray-400 text-sm">{currency}</span>
                                 <input
                                   type="number"
                                   step="0.01"
                                   min="0"
                                   value={editedPrice}
                                   onChange={(e) => setEditedPrice(e.target.value)}
-                                  className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-2xl font-bold"
+                                  className="w-28 px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-lg font-bold"
                                   placeholder="0.00"
                                 />
-                              </div>
-                              {/* Show discount preview in edit mode */}
-                              {currentPrice > 0 && (
-                                <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3 border border-gray-200 dark:border-gray-600">
-                                  <div className="flex items-baseline gap-2 mb-1">
-                                    <span className="text-sm text-gray-500 dark:text-gray-400 line-through">
-                                      {currency} {priceInfo.original.toFixed(2)}
-                                    </span>
-                                    <span className="text-xl font-bold text-green-600 dark:text-green-400">
+                                {currentPrice > 0 && (
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-gray-400">→</span>
+                                    <span className="text-lg font-bold text-green-600 dark:text-green-400">
                                       {currency} {priceInfo.discounted.toFixed(2)}
                                     </span>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300">
-                                      Save {currency} {priceInfo.discountAmount.toFixed(2)} ({priceInfo.discountPercent.toFixed(1)}%)
+                                    <span className="text-xs text-red-600 dark:text-red-400">
+                                      ({priceInfo.discountPercent.toFixed(1)}% off)
                                     </span>
-                                    {priceInfo.discounted === 4.00 && priceInfo.original > 4.00 && (
-                                      <span className="text-xs text-gray-500 dark:text-gray-400">
-                                        (Minimum price applied)
-                                      </span>
-                                    )}
                                   </div>
-                                </div>
-                              )}
+                                )}
+                              </div>
                             </div>
                           ) : (
-                            <div className="space-y-2">
-                              {/* Original and Discounted Price Display */}
-                              <div className="flex items-baseline gap-3 flex-wrap">
-                                {priceInfo.original > priceInfo.discounted && (
-                                  <span className="text-lg text-gray-500 dark:text-gray-400 line-through">
-                                    {currency} {priceInfo.original.toFixed(2)}
-                                  </span>
-                                )}
-                                <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                                  {currency} {priceInfo.discounted.toFixed(2)}
-                                </span>
-                              </div>
-                              
-                              {/* Discount Badge */}
+                            <div className="flex items-center gap-2 flex-wrap">
                               {priceInfo.original > priceInfo.discounted && (
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <span className="inline-flex items-center px-2.5 py-1 rounded-md text-sm font-semibold bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300">
-                                    Save {currency} {priceInfo.discountAmount.toFixed(2)}
-                                  </span>
-                                  <span className="inline-flex items-center px-2.5 py-1 rounded-md text-sm font-semibold bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300">
-                                    {priceInfo.discountPercent.toFixed(1)}% OFF
-                                  </span>
-                                  {priceInfo.discounted === 4.00 && priceInfo.original > 4.00 && (
-                                    <span className="text-xs text-gray-500 dark:text-gray-400 italic">
-                                      (Minimum price of {currency} 4.00 applied)
-                                    </span>
-                                  )}
-                                </div>
+                                <span className="text-sm text-gray-500 dark:text-gray-400 line-through">
+                                  {currency} {priceInfo.original.toFixed(2)}
+                                </span>
+                              )}
+                              <span className="text-xl font-bold text-green-600 dark:text-green-400">
+                                {currency} {priceInfo.discounted.toFixed(2)}
+                              </span>
+                              {priceInfo.original > priceInfo.discounted && (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300">
+                                  Save {currency} {priceInfo.discountAmount.toFixed(2)} ({priceInfo.discountPercent.toFixed(1)}%)
+                                </span>
                               )}
                             </div>
                           )}
@@ -1965,15 +1879,13 @@ export default function ProductSearchPage() {
 
                     {/* Condition - Editable */}
                     <div>
-                      <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">
-                        Condition
-                      </h3>
+                      <h3 className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Condition</h3>
                       {isEditing ? (
                         <div>
                           <select
                             value={editedCondition}
                             onChange={(e) => setEditedCondition(e.target.value)}
-                            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                            className="w-full px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
                           >
                             {conditions.map((condition) => (
                               <option key={condition} value={condition}>
@@ -1982,18 +1894,18 @@ export default function ProductSearchPage() {
                             ))}
                           </select>
                           {editedCondition && getConditionDescription(editedCondition) && (
-                            <p className="mt-2 text-xs text-blue-600 dark:text-blue-400 italic">
+                            <p className="mt-1 text-xs text-blue-600 dark:text-blue-400 italic">
                               {getConditionDescription(editedCondition)}
                             </p>
                           )}
                         </div>
                       ) : (
                         <div>
-                          <p className="mt-1 text-gray-900 dark:text-white font-semibold">
+                          <p className="text-gray-900 dark:text-white font-semibold">
                             {productData.condition || editedCondition || "Used - Very Good"}
                           </p>
                           {(productData.condition || editedCondition || "Used - Very Good") && getConditionDescription(productData.condition || editedCondition || "Used - Very Good") && (
-                            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400 italic">
+                            <p className="mt-1 text-xs text-gray-600 dark:text-gray-400 italic">
                               {getConditionDescription(productData.condition || editedCondition || "Used - Very Good")}
                             </p>
                           )}
@@ -2001,29 +1913,17 @@ export default function ProductSearchPage() {
                       )}
                     </div>
 
-                    {/* Seller Note */}
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">
-                        Seller Note
-                      </h3>
-                      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-3">
-                        <p className="text-sm text-gray-700 dark:text-gray-300">
-                          Please note: any mention of a digital copy or code may be expired and/or unavailable. This does not affect the quality or functionality of the DVD.
-                        </p>
-                      </div>
-                    </div>
-
                     {/* Action Buttons */}
-                    <div className="flex flex-col sm:flex-row gap-3 mt-6">
+                    <div className="flex flex-wrap gap-2 mt-2">
                       {/* List on eBay Button */}
                       <button
                         onClick={() => handleListOnEbay()}
                         disabled={listingLoading}
-                        className="px-6 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
+                        className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors duration-200 flex items-center justify-center gap-2 text-sm"
                       >
                         {listingLoading ? (
                           <>
-                            <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                            <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
                               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                             </svg>
@@ -2031,7 +1931,7 @@ export default function ProductSearchPage() {
                           </>
                         ) : (
                           <>
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                             </svg>
                             List on eBay
@@ -2045,7 +1945,7 @@ export default function ProductSearchPage() {
                           href={productData.itemWebUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-block px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors duration-200 text-center"
+                          className="inline-block px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors duration-200 text-center text-sm"
                         >
                           View on eBay
                         </a>
@@ -2057,7 +1957,7 @@ export default function ProductSearchPage() {
                           href={listingSuccess}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-block px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors duration-200 text-center"
+                          className="inline-block px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors duration-200 text-center text-sm"
                         >
                           View Listing
                         </a>
@@ -2066,20 +1966,15 @@ export default function ProductSearchPage() {
                     
                     {/* Listing Success Message */}
                     {listingSuccess && (
-                      <div className="mt-4 p-4 bg-green-100 dark:bg-green-900/30 border border-green-400 dark:border-green-700 text-green-700 dark:text-green-400 rounded-lg">
-                        <div className="flex items-start gap-2">
-                          <svg className="w-5 h-5 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <div className="mt-2 p-2 bg-green-100 dark:bg-green-900/30 border border-green-400 dark:border-green-700 text-green-700 dark:text-green-400 rounded-lg">
+                        <div className="flex items-center gap-2">
+                          <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                           </svg>
-                          <div>
-                            <p className="font-semibold">Success!</p>
-                            {listedSku && (
-                              <p className="font-mono text-sm font-semibold my-1">
-                                {listedSku}
-                              </p>
-                            )}
-                            <p>{listingSuccess}</p>
-                          </div>
+                          <span className="font-semibold text-sm">Success!</span>
+                          {listedSku && (
+                            <span className="font-mono text-sm font-semibold">{listedSku}</span>
+                          )}
                         </div>
                       </div>
                     )}
@@ -2155,18 +2050,18 @@ export default function ProductSearchPage() {
                     
                     {/* Listing Error Message */}
                     {listingError && !showAspectForm && (
-                      <div className="mt-4 p-4 bg-red-100 dark:bg-red-900/30 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-400 rounded-lg">
+                      <div className="mt-2 p-2 bg-red-100 dark:bg-red-900/30 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-400 rounded-lg">
                         <div className="flex items-start gap-2">
-                          <svg className="w-5 h-5 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className="w-4 h-4 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                           </svg>
-                          <div className="flex-1">
+                          <div className="flex-1 text-sm">
                             <p className="font-semibold">Error</p>
-                            <p className="mb-3">{listingError}</p>
+                            <p className="mb-2">{listingError}</p>
                             {(listingError.includes("2004") || listingError.includes("sell.inventory") || listingError.includes("reconnect")) && (
                               <Link
                                 href="/ebay-connect"
-                                className="inline-block px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors duration-200 text-sm"
+                                className="inline-block px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors duration-200 text-xs"
                               >
                                 Go to eBay Connect Page →
                               </Link>
@@ -2177,18 +2072,34 @@ export default function ProductSearchPage() {
                     )}
                   </div>
                 </div>
-
-                {/* All Product Data (Debug/Complete View) */}
-                <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                    Complete Product Data
-                  </h3>
-                  <pre className="bg-gray-100 dark:bg-gray-900 p-4 rounded-lg overflow-auto text-sm">
-                    {JSON.stringify(productData, null, 2)}
-                  </pre>
-                </div>
               </div>
             </div>
+
+              {/* Footer: Seller Note + Keyboard Shortcuts */}
+              <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg">
+                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2">
+                  {/* Seller Note */}
+                  <div className="flex items-start gap-2 text-xs text-gray-600 dark:text-gray-400">
+                    <svg className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>
+                      <span className="font-medium">Seller Note:</span> Please note: any mention of a digital copy or code may be expired and/or unavailable. This does not affect the quality or functionality of the DVD.
+                    </span>
+                  </div>
+                  
+                  {/* Keyboard Shortcuts */}
+                  <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400 shrink-0">
+                    <svg className="w-3 h-3 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
+                    </svg>
+                    <kbd className="px-1.5 py-0.5 text-xs font-semibold text-gray-800 bg-gray-100 border border-gray-200 rounded dark:bg-gray-700 dark:text-gray-100 dark:border-gray-600">Space</kbd>
+                    <span>to confirm</span>
+                    <kbd className="px-1.5 py-0.5 text-xs font-semibold text-gray-800 bg-gray-100 border border-gray-200 rounded dark:bg-gray-700 dark:text-gray-100 dark:border-gray-600">Esc</kbd>
+                    <span>to cancel</span>
+                  </div>
+                </div>
+              </div>
             </>
           )}
 
