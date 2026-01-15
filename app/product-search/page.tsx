@@ -70,6 +70,7 @@ export default function ProductSearchPage() {
   
   // Banned keywords state
   const [bannedKeywords, setBannedKeywords] = useState<string[]>([])
+  const [keywordsLoaded, setKeywordsLoaded] = useState(false)
   
   // Mean price tracking state
   const [isMeanPrice, setIsMeanPrice] = useState(false)
@@ -187,8 +188,11 @@ export default function ProductSearchPage() {
 
     // Fetch banned keywords
     const loadBannedKeywords = async () => {
+      console.log("[ProductSearch] Loading banned keywords...")
       const keywords = await fetchBannedKeywords()
+      console.log("[ProductSearch] Banned keywords loaded:", keywords)
       setBannedKeywords(keywords)
+      setKeywordsLoaded(true)
     }
     loadBannedKeywords()
 
@@ -1887,7 +1891,14 @@ export default function ProductSearchPage() {
                         />
                       ) : (
                         <p className="text-gray-900 dark:text-white">
-                          {productData.title ? removeKeywords(productData.title, bannedKeywords) : "No title"}
+                          {(() => {
+                            console.log("[Title Display] productData.title:", productData.title)
+                            console.log("[Title Display] bannedKeywords:", bannedKeywords)
+                            console.log("[Title Display] keywordsLoaded:", keywordsLoaded)
+                            const result = productData.title ? removeKeywords(productData.title, bannedKeywords) : "No title"
+                            console.log("[Title Display] Result after removeKeywords:", result)
+                            return result
+                          })()}
                         </p>
                       )}
                     </div>

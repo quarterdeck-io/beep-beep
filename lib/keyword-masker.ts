@@ -43,7 +43,10 @@ export function maskKeywords(text: string, bannedKeywords: string[]): string {
  * @returns The text with keywords removed
  */
 export function removeKeywords(text: string, bannedKeywords: string[]): string {
+  console.log("[removeKeywords] Called with:", { text, bannedKeywords, keywordCount: bannedKeywords.length })
+  
   if (!text || bannedKeywords.length === 0) {
+    console.log("[removeKeywords] Early return - no text or no keywords")
     return text
   }
 
@@ -60,6 +63,10 @@ export function removeKeywords(text: string, bannedKeywords: string[]): string {
     // Create a case-insensitive regex that matches the keyword as a whole word
     // This ensures we match "DVD" in "DVD player" but not "DVD" in "ADVD"
     const regex = new RegExp(`\\b${escapeRegex(keyword)}\\b`, "gi")
+    
+    // Check if keyword matches
+    const matches = processedText.match(regex)
+    console.log(`[removeKeywords] Keyword "${keyword}" - Regex: ${regex} - Matches:`, matches)
     
     // Remove the keyword completely
     processedText = processedText.replace(regex, "")
@@ -93,15 +100,21 @@ function escapeRegex(str: string): string {
  * This is a client-side utility function
  */
 export async function fetchBannedKeywords(): Promise<string[]> {
+  console.log("[fetchBannedKeywords] Starting fetch...")
   try {
     const res = await fetch("/api/settings/banned-keywords")
+    console.log("[fetchBannedKeywords] Response status:", res.status)
     if (res.ok) {
       const data = await res.json()
-      return data.keywords?.map((k: { keyword: string }) => k.keyword.toLowerCase()) || []
+      console.log("[fetchBannedKeywords] Raw API response:", data)
+      const keywords = data.keywords?.map((k: { keyword: string }) => k.keyword.toLowerCase()) || []
+      console.log("[fetchBannedKeywords] Processed keywords:", keywords)
+      return keywords
     }
+    console.log("[fetchBannedKeywords] Response not ok")
     return []
   } catch (error) {
-    console.error("Failed to fetch banned keywords:", error)
+    console.error("[fetchBannedKeywords] Error:", error)
     return []
   }
 }
