@@ -291,7 +291,12 @@ export default function ProductSearchPage() {
       
       setProductData(productDataWithDefaultCondition)
       // Initialize editable fields with product data
-      setEditedTitle(data.title || "")
+      // Apply keyword removal to title
+      const processedTitle = removeKeywords(data.title || "", bannedKeywords)
+      console.log("[handleSearch] Original title:", data.title)
+      console.log("[handleSearch] Banned keywords:", bannedKeywords)
+      console.log("[handleSearch] Processed title:", processedTitle)
+      setEditedTitle(processedTitle)
       // If override description is enabled, start with empty description so user can type their own
       // Otherwise, populate from product data
       // Note: If user has previously saved an override description, it will be in productData and will be preserved when they edit again
@@ -355,7 +360,7 @@ export default function ProductSearchPage() {
     console.log("[FRONTEND DEBUG] ========== CANCEL EDIT CLICKED ==========")
     // Reset to original values, but always default condition to "Used - Very Good"
     if (productData) {
-      setEditedTitle(productData.title || "")
+      setEditedTitle(removeKeywords(productData.title || "", bannedKeywords))
       // If override description is enabled:
       // - If productData has a saved description (from previous save), use it
       // - Otherwise, reset to empty so user can type new one
