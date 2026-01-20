@@ -1489,6 +1489,13 @@ export default function ProductSearchPage() {
                   type="text"
                   value={upc}
                   onChange={(e) => setUpc(e.target.value)}
+                  onKeyDown={(e) => {
+                    // Handle spacebar in search input: if productData exists, list instead of typing space
+                    if (e.key === " " && productData && !listingLoading && !scannerActive && !showAspectForm) {
+                      e.preventDefault()
+                      handleListOnEbay()
+                    }
+                  }}
                   placeholder="Enter UPC Code (e.g., 885909950805)"
                   className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   required
