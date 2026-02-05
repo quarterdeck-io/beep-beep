@@ -35,6 +35,7 @@ export default function ProductSearchPage() {
   const scannerRef = useRef<Html5QrcodeScanner | null>(null)
   const scannerElementId = "html5-qrcode-scanner"
   const errorCooldownRef = useRef<NodeJS.Timeout | null>(null)
+  const upcInputRef = useRef<HTMLInputElement | null>(null)
   
   // Editable fields state
   const [isEditing, setIsEditing] = useState(false)
@@ -410,6 +411,12 @@ export default function ProductSearchPage() {
     setDuplicateUpc("")
     setDuplicateCheckComplete(false) // Clear duplicate check status
     setInventoryMessage(null) // Clear inventory increase message
+
+    // After clearing, refocus UPC input so the next barcode scan goes straight into it
+    if (upcInputRef.current) {
+      upcInputRef.current.focus()
+      upcInputRef.current.select()
+    }
   }
   
   // Check if products with this UPC already exist in eBay inventory
@@ -1485,6 +1492,7 @@ export default function ProductSearchPage() {
             <form onSubmit={handleSearch}>
               <div className="flex gap-3">
                 <input
+                  ref={upcInputRef}
                   id="upc"
                   type="text"
                   value={upc}
