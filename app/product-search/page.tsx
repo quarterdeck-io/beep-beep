@@ -90,6 +90,12 @@ export default function ProductSearchPage() {
   // Override description settings state
   const [useOverrideDescription, setUseOverrideDescription] = useState<boolean>(false)
   const [universalOverrideDescription, setUniversalOverrideDescription] = useState<string>("")
+
+  // Seller note editing setting + per-listing edited value (only editable in Edit Mode)
+  const DEFAULT_SELLER_NOTE =
+    "Please note: any mention of a digital copy or code may be expired and/or unavailable. This does not affect the quality or functionality of the DVD."
+  const [enableSellerNoteEditing, setEnableSellerNoteEditing] = useState<boolean>(false)
+  const [editedSellerNote, setEditedSellerNote] = useState<string>(DEFAULT_SELLER_NOTE)
   
   // Available conditions for dropdown
   const conditions = [
@@ -252,6 +258,21 @@ export default function ProductSearchPage() {
       }
     }
     loadOverrideDescriptionSettings()
+
+    // Fetch seller note editing setting
+    const loadSellerNoteEditingSettings = async () => {
+      try {
+        const res = await fetch("/api/settings/seller-note")
+        if (res.ok) {
+          const data = await res.json()
+          setEnableSellerNoteEditing(data.enableSellerNoteEditing || false)
+        }
+      } catch (error) {
+        console.error("Failed to fetch seller note editing settings:", error)
+        setEnableSellerNoteEditing(false)
+      }
+    }
+    loadSellerNoteEditingSettings()
   }, [])
 
   const performSearch = async (searchValue: string) => {
@@ -304,6 +325,7 @@ export default function ProductSearchPage() {
       setEditedDescription(useOverrideDescription ? "" : (data.shortDescription || data.description || ""))
       setEditedCondition(defaultCondition)
       setEditedPrice(data.price?.value || "0.00")
+      setEditedSellerNote(DEFAULT_SELLER_NOTE)
       setIsMeanPrice(data._searchMetadata?.isMeanPrice || false)
       // Initialize edit mode based on user's default edit mode setting
       setIsEditing(defaultEditMode || false)
@@ -381,6 +403,7 @@ export default function ProductSearchPage() {
       }
       setEditedCondition("Used - Very Good")
       setEditedPrice(productData.price?.value || "0.00")
+      setEditedSellerNote(DEFAULT_SELLER_NOTE)
     }
     setIsEditing(false)
     console.log("[FRONTEND DEBUG] Edit mode cancelled")
@@ -394,6 +417,7 @@ export default function ProductSearchPage() {
     setEditedDescription("")
     setEditedCondition("")
     setEditedPrice("")
+    setEditedSellerNote(DEFAULT_SELLER_NOTE)
     setIsMeanPrice(false) // Clear mean price flag
     setIsEditing(false)
     setListingLoading(false)
@@ -715,6 +739,10 @@ export default function ProductSearchPage() {
           description: descriptionToSend,
           price: finalListingPrice, // Use discounted price with minimum floor
           condition: editedCondition || "Used - Very Good",
+          conditionDescription:
+            enableSellerNoteEditing && isEditing
+              ? editedSellerNote
+              : undefined,
           
           // Images - primary and additional
           imageUrl: productData.image?.imageUrl || "",
@@ -2256,9 +2284,21 @@ export default function ProductSearchPage() {
                     <svg className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    <span>
-                      <span className="font-medium">Seller Note:</span> Please note: any mention of a digital copy or code may be expired and/or unavailable. This does not affect the quality or functionality of the DVD.
-                    </span>
+                    {enableSellerNoteEditing && isEditing ? (
+                      <div className="flex-1">
+                        <div className="font-medium mb-1 text-gray-700 dark:text-gray-200">Seller Note:</div>
+                        <textarea
+                          value={editedSellerNote}
+                          onChange={(e) => setEditedSellerNote(e.target.value)}
+                          rows={3}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm resize-y"
+                        />
+                      </div>
+                    ) : (
+                      <span>
+                        <span className="font-medium">Seller Note:</span> {DEFAULT_SELLER_NOTE}
+                      </span>
+                    )}
                   </div>
                   
                   {/* Keyboard Shortcuts */}

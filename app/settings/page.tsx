@@ -60,6 +60,11 @@ export default function SettingsPage() {
   const [loadingOverrideDescription, setLoadingOverrideDescription] = useState(false)
   const [savingOverrideDescription, setSavingOverrideDescription] = useState(false)
 
+  // Seller Note Editing Settings state
+  const [enableSellerNoteEditing, setEnableSellerNoteEditing] = useState<boolean>(false)
+  const [loadingSellerNoteEditing, setLoadingSellerNoteEditing] = useState(false)
+  const [savingSellerNoteEditing, setSavingSellerNoteEditing] = useState(false)
+
   // Fetch current settings on mount
   useEffect(() => {
     const fetchSettings = async () => {
@@ -223,6 +228,26 @@ export default function SettingsPage() {
     }
 
     fetchOverrideDescriptionSettings()
+  }, [])
+
+  // Fetch seller note editing settings on mount
+  useEffect(() => {
+    const fetchSellerNoteEditingSettings = async () => {
+      try {
+        setLoadingSellerNoteEditing(true)
+        const res = await fetch("/api/settings/seller-note")
+        if (res.ok) {
+          const data = await res.json()
+          setEnableSellerNoteEditing(data.enableSellerNoteEditing || false)
+        }
+      } catch (error) {
+        console.error("Failed to fetch seller note editing settings:", error)
+      } finally {
+        setLoadingSellerNoteEditing(false)
+      }
+    }
+
+    fetchSellerNoteEditingSettings()
   }, [])
 
   // Fetch available policies when user clicks to load them
@@ -534,6 +559,36 @@ export default function SettingsPage() {
       setMessage({ type: "error", text: "Failed to save override description settings" })
     } finally {
       setSavingOverrideDescription(false)
+    }
+  }
+
+  const handleSaveSellerNoteEditingSettings = async () => {
+    setSavingSellerNoteEditing(true)
+    setMessage(null)
+
+    try {
+      const res = await fetch("/api/settings/seller-note", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          enableSellerNoteEditing,
+        }),
+      })
+
+      const data = await res.json()
+
+      if (res.ok) {
+        setMessage({ type: "success", text: "✓ Seller note editing setting saved successfully" })
+      } else {
+        const errorMsg = data.details ? `${data.error}: ${data.details}` : (data.error || "Failed to save seller note editing setting")
+        setMessage({ type: "error", text: errorMsg })
+      }
+    } catch (error) {
+      setMessage({ type: "error", text: "Failed to save seller note editing setting" })
+    } finally {
+      setSavingSellerNoteEditing(false)
     }
   }
 
@@ -1078,6 +1133,60 @@ export default function SettingsPage() {
                     className="px-6 py-2 bg-gray-800 dark:bg-gray-700 text-white rounded-md hover:bg-gray-700 dark:hover:bg-gray-600 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {savingEditMode ? "Saving..." : "Save Edit Mode Settings"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Seller Note Editing Settings Card */}
+          <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6 mt-6">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+              Seller Note Editing
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+              When enabled, the Seller Note footer on the product listing page becomes editable in Edit Mode, and the edited text will be sent to eBay as the listing&apos;s conditionDescription.
+            </p>
+
+            {loadingSellerNoteEditing ? (
+              <div className="text-center py-4">
+                <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">Loading seller note editing setting...</p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {/* Toggle Switch */}
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <label className="block text-sm font-medium text-gray-900 dark:text-white mb-1">
+                      Enable Seller Note Editing
+                    </label>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {enableSellerNoteEditing
+                        ? "Edit Mode will show a textarea for the Seller Note footer"
+                        : "Seller Note footer will use the default text and is not editable"}
+                    </p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={enableSellerNoteEditing}
+                      onChange={(e) => setEnableSellerNoteEditing(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div
+                      className={`w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600`}
+                    />
+                  </label>
+                </div>
+
+                <div className="pt-4">
+                  <button
+                    onClick={handleSaveSellerNoteEditingSettings}
+                    disabled={savingSellerNoteEditing}
+                    className="px-6 py-2 bg-gray-800 dark:bg-gray-700 text-white rounded-md hover:bg-gray-700 dark:hover:bg-gray-600 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {savingSellerNoteEditing ? "Saving..." : "Save Seller Note Editing Setting"}
                   </button>
                 </div>
               </div>

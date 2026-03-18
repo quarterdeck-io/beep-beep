@@ -35,6 +35,7 @@ export async function POST(req: Request) {
       description, 
       price, 
       condition, 
+      conditionDescription,
       imageUrl, 
       categoryId, 
       upc, 
@@ -100,7 +101,21 @@ export async function POST(req: Request) {
     }
     
     // Seller note text (will be used in conditionDescription field, not in description)
-    const sellerNote = "Please note: any mention of a digital copy or code may be expired and/or unavailable. This does not affect the quality or functionality of the DVD."
+    const defaultSellerNote =
+      "Please note: any mention of a digital copy or code may be expired and/or unavailable. This does not affect the quality or functionality of the DVD."
+
+    let sellerNote = defaultSellerNote
+    if (conditionDescription !== undefined) {
+      if (typeof conditionDescription !== "string") {
+        return NextResponse.json(
+          { error: "conditionDescription must be a string" },
+          { status: 400 }
+        )
+      }
+
+      const trimmed = conditionDescription.trim()
+      sellerNote = trimmed.length > 0 ? trimmed : defaultSellerNote
+    }
     
     // Price validation
     const priceNum = parseFloat(price)
@@ -601,7 +616,6 @@ export async function POST(req: Request) {
     }
     
     // Set seller note in conditionDescription field (this appears as "Seller Notes" on eBay)
-    // Note: eBay uses conditionDescription field to display "Seller Notes" in the listing
     inventoryItemPayload.conditionDescription = sellerNote
     
     console.log("[LIST API DEBUG] inventoryItemPayload.product.description:", inventoryItemPayload.product.description)
