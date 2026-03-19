@@ -63,6 +63,15 @@ export async function POST(req: Request) {
       shortDescription: shortDescription,
       descriptionPreview: description ? description.substring(0, 100) : "null/undefined"
     })
+    console.log("[LIST API DEBUG] Incoming conditionDescription:", {
+      conditionDescriptionType: typeof conditionDescription,
+      hasConditionDescription: conditionDescription !== undefined,
+      conditionDescriptionLength: typeof conditionDescription === "string" ? conditionDescription.length : 0,
+      conditionDescriptionPreview:
+        typeof conditionDescription === "string"
+          ? conditionDescription.substring(0, 120)
+          : "not_provided",
+    })
 
     // Validate and sanitize required fields
     const missingFields: string[] = []
@@ -105,6 +114,7 @@ export async function POST(req: Request) {
       "Please note: any mention of a digital copy or code may be expired and/or unavailable. This does not affect the quality or functionality of the DVD."
 
     let sellerNote = defaultSellerNote
+    let sellerNoteSource = "DEFAULT_HARDCODED"
     if (conditionDescription !== undefined) {
       if (typeof conditionDescription !== "string") {
         return NextResponse.json(
@@ -115,7 +125,13 @@ export async function POST(req: Request) {
 
       const trimmed = conditionDescription.trim()
       sellerNote = trimmed.length > 0 ? trimmed : defaultSellerNote
+      sellerNoteSource = trimmed.length > 0 ? "REQUEST_CONDITION_DESCRIPTION" : "DEFAULT_HARDCODED_EMPTY_REQUEST"
     }
+    console.log("[LIST API DEBUG] Final Seller Note Decision:", {
+      sellerNoteSource,
+      sellerNoteLength: sellerNote.length,
+      sellerNotePreview: sellerNote.substring(0, 120),
+    })
     
     // Price validation
     const priceNum = parseFloat(price)
@@ -617,6 +633,12 @@ export async function POST(req: Request) {
     
     // Set seller note in conditionDescription field (this appears as "Seller Notes" on eBay)
     inventoryItemPayload.conditionDescription = sellerNote
+    console.log("[LIST API DEBUG] inventoryItemPayload.conditionDescription:", {
+      value: inventoryItemPayload.conditionDescription,
+      length: inventoryItemPayload.conditionDescription
+        ? inventoryItemPayload.conditionDescription.length
+        : 0,
+    })
     
     console.log("[LIST API DEBUG] inventoryItemPayload.product.description:", inventoryItemPayload.product.description)
     console.log("[LIST API DEBUG] Full inventoryItemPayload:", JSON.stringify(inventoryItemPayload, null, 2))

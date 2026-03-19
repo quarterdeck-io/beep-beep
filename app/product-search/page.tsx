@@ -728,6 +728,19 @@ export default function ProductSearchPage() {
         descriptionSource: descriptionSource
       }, null, 2))
 
+      const conditionDescriptionToSend =
+        enableSellerNoteEditing && isEditing ? editedSellerNote : undefined
+
+      console.log("[FRONTEND DEBUG] Listing - Condition Description Decision:", JSON.stringify({
+        enableSellerNoteEditing,
+        isEditing,
+        willSendConditionDescription: conditionDescriptionToSend !== undefined,
+        conditionDescriptionLength: conditionDescriptionToSend ? conditionDescriptionToSend.length : 0,
+        conditionDescriptionPreview: conditionDescriptionToSend
+          ? conditionDescriptionToSend.substring(0, 120)
+          : "default_on_backend",
+      }, null, 2))
+
       const response = await fetch("/api/ebay/list", {
         method: "POST",
         headers: {
@@ -739,10 +752,7 @@ export default function ProductSearchPage() {
           description: descriptionToSend,
           price: finalListingPrice, // Use discounted price with minimum floor
           condition: editedCondition || "Used - Very Good",
-          conditionDescription:
-            enableSellerNoteEditing && isEditing
-              ? editedSellerNote
-              : undefined,
+          conditionDescription: conditionDescriptionToSend,
           
           // Images - primary and additional
           imageUrl: productData.image?.imageUrl || "",
@@ -2278,14 +2288,14 @@ export default function ProductSearchPage() {
 
               {/* Footer: Seller Note + Keyboard Shortcuts */}
               <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg">
-                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2">
+                <div className="flex flex-col lg:flex-row lg:items-start gap-3">
                   {/* Seller Note */}
-                  <div className="flex items-start gap-2 text-xs text-gray-600 dark:text-gray-400">
+                  <div className="flex items-start gap-2 text-xs text-gray-600 dark:text-gray-400 flex-1 min-w-0">
                     <svg className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     {enableSellerNoteEditing && isEditing ? (
-                      <div className="flex-1">
+                      <div className="flex-1 min-w-0">
                         <div className="font-medium mb-1 text-gray-700 dark:text-gray-200">Seller Note:</div>
                         <textarea
                           value={editedSellerNote}
@@ -2302,7 +2312,7 @@ export default function ProductSearchPage() {
                   </div>
                   
                   {/* Keyboard Shortcuts */}
-                  <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400 shrink-0">
+                  <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400 shrink-0 lg:self-center">
                     <svg className="w-3 h-3 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
                       <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
                     </svg>
