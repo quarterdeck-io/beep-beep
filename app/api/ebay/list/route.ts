@@ -113,9 +113,17 @@ export async function POST(req: Request) {
     const defaultSellerNote =
       "Please note: any mention of a digital copy or code may be expired and/or unavailable. This does not affect the quality or functionality of the DVD."
 
+    const sellerNoteSettings = await (prisma as any).sellerNoteSettings.findUnique({
+      where: { userId: session.user.id },
+    })
+
     let sellerNote = defaultSellerNote
     let sellerNoteSource = "DEFAULT_HARDCODED"
-    if (conditionDescription !== undefined) {
+    if (sellerNoteSettings?.enableSellerNoteEditing) {
+      const universalSellerNote = (sellerNoteSettings.sellerNoteText || "").trim()
+      sellerNote = universalSellerNote.length > 0 ? universalSellerNote : defaultSellerNote
+      sellerNoteSource = universalSellerNote.length > 0 ? "UNIVERSAL_SETTING" : "DEFAULT_HARDCODED_EMPTY_UNIVERSAL"
+    } else if (conditionDescription !== undefined) {
       if (typeof conditionDescription !== "string") {
         return NextResponse.json(
           { error: "conditionDescription must be a string" },

@@ -62,6 +62,9 @@ export default function SettingsPage() {
 
   // Seller Note Editing Settings state
   const [enableSellerNoteEditing, setEnableSellerNoteEditing] = useState<boolean>(false)
+  const [sellerNoteText, setSellerNoteText] = useState<string>(
+    "Please note: any mention of a digital copy or code may be expired and/or unavailable. This does not affect the quality or functionality of the DVD."
+  )
   const [loadingSellerNoteEditing, setLoadingSellerNoteEditing] = useState(false)
   const [savingSellerNoteEditing, setSavingSellerNoteEditing] = useState(false)
 
@@ -239,6 +242,7 @@ export default function SettingsPage() {
         if (res.ok) {
           const data = await res.json()
           setEnableSellerNoteEditing(data.enableSellerNoteEditing || false)
+          setSellerNoteText(data.sellerNoteText || "")
         }
       } catch (error) {
         console.error("Failed to fetch seller note editing settings:", error)
@@ -574,6 +578,7 @@ export default function SettingsPage() {
         },
         body: JSON.stringify({
           enableSellerNoteEditing,
+          sellerNoteText,
         }),
       })
 
@@ -1142,10 +1147,10 @@ export default function SettingsPage() {
           {/* Seller Note Editing Settings Card */}
           <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6 mt-6">
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-              Seller Note Editing
+              Universal Seller Note
             </h2>
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-              When enabled, the Seller Note footer on the product listing page becomes editable in Edit Mode, and the edited text will be sent to eBay as the listing&apos;s conditionDescription.
+              Set a universal seller note that will be sent to eBay as <span className="font-mono">conditionDescription</span> for all listings when enabled.
             </p>
 
             {loadingSellerNoteEditing ? (
@@ -1159,12 +1164,12 @@ export default function SettingsPage() {
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
                     <label className="block text-sm font-medium text-gray-900 dark:text-white mb-1">
-                      Enable Seller Note Editing
+                      Enable Universal Seller Note
                     </label>
                     <p className="text-xs text-gray-500 dark:text-gray-400">
                       {enableSellerNoteEditing
-                        ? "Edit Mode will show a textarea for the Seller Note footer"
-                        : "Seller Note footer will use the default text and is not editable"}
+                        ? "All listings will use the seller note text below"
+                        : "Listings will use the default seller note text"}
                     </p>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">
@@ -1179,6 +1184,31 @@ export default function SettingsPage() {
                     />
                   </label>
                 </div>
+
+                {enableSellerNoteEditing && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-900 dark:text-white mb-2">
+                      Universal Seller Note Text
+                    </label>
+                    <textarea
+                      value={sellerNoteText}
+                      onChange={(e) => setSellerNoteText(e.target.value)}
+                      placeholder="Enter seller note text for all listings"
+                      rows={4}
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-y"
+                    />
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      This note is applied to every listing as eBay&apos;s conditionDescription.
+                    </p>
+                  </div>
+                )}
+
+                {enableSellerNoteEditing && sellerNoteText && (
+                  <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                    <p className="text-sm font-medium text-blue-800 dark:text-blue-300 mb-2">Preview:</p>
+                    <p className="text-sm text-blue-700 dark:text-blue-400 whitespace-pre-wrap">{sellerNoteText}</p>
+                  </div>
+                )}
 
                 <div className="pt-4">
                   <button

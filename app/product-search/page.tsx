@@ -95,7 +95,7 @@ export default function ProductSearchPage() {
   const DEFAULT_SELLER_NOTE =
     "Please note: any mention of a digital copy or code may be expired and/or unavailable. This does not affect the quality or functionality of the DVD."
   const [enableSellerNoteEditing, setEnableSellerNoteEditing] = useState<boolean>(false)
-  const [editedSellerNote, setEditedSellerNote] = useState<string>(DEFAULT_SELLER_NOTE)
+  const [universalSellerNoteText, setUniversalSellerNoteText] = useState<string>(DEFAULT_SELLER_NOTE)
   
   // Available conditions for dropdown
   const conditions = [
@@ -266,10 +266,12 @@ export default function ProductSearchPage() {
         if (res.ok) {
           const data = await res.json()
           setEnableSellerNoteEditing(data.enableSellerNoteEditing || false)
+          setUniversalSellerNoteText(data.sellerNoteText || DEFAULT_SELLER_NOTE)
         }
       } catch (error) {
         console.error("Failed to fetch seller note editing settings:", error)
         setEnableSellerNoteEditing(false)
+        setUniversalSellerNoteText(DEFAULT_SELLER_NOTE)
       }
     }
     loadSellerNoteEditingSettings()
@@ -325,7 +327,6 @@ export default function ProductSearchPage() {
       setEditedDescription(useOverrideDescription ? "" : (data.shortDescription || data.description || ""))
       setEditedCondition(defaultCondition)
       setEditedPrice(data.price?.value || "0.00")
-      setEditedSellerNote(DEFAULT_SELLER_NOTE)
       setIsMeanPrice(data._searchMetadata?.isMeanPrice || false)
       // Initialize edit mode based on user's default edit mode setting
       setIsEditing(defaultEditMode || false)
@@ -403,7 +404,6 @@ export default function ProductSearchPage() {
       }
       setEditedCondition("Used - Very Good")
       setEditedPrice(productData.price?.value || "0.00")
-      setEditedSellerNote(DEFAULT_SELLER_NOTE)
     }
     setIsEditing(false)
     console.log("[FRONTEND DEBUG] Edit mode cancelled")
@@ -417,7 +417,6 @@ export default function ProductSearchPage() {
     setEditedDescription("")
     setEditedCondition("")
     setEditedPrice("")
-    setEditedSellerNote(DEFAULT_SELLER_NOTE)
     setIsMeanPrice(false) // Clear mean price flag
     setIsEditing(false)
     setListingLoading(false)
@@ -729,7 +728,7 @@ export default function ProductSearchPage() {
       }, null, 2))
 
       const conditionDescriptionToSend =
-        enableSellerNoteEditing && isEditing ? editedSellerNote : undefined
+        enableSellerNoteEditing ? universalSellerNoteText : undefined
 
       console.log("[FRONTEND DEBUG] Listing - Condition Description Decision:", JSON.stringify({
         enableSellerNoteEditing,
@@ -2294,21 +2293,10 @@ export default function ProductSearchPage() {
                     <svg className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    {enableSellerNoteEditing && isEditing ? (
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium mb-1 text-gray-700 dark:text-gray-200">Seller Note:</div>
-                        <textarea
-                          value={editedSellerNote}
-                          onChange={(e) => setEditedSellerNote(e.target.value)}
-                          rows={3}
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm resize-y"
-                        />
-                      </div>
-                    ) : (
-                      <span>
-                        <span className="font-medium">Seller Note:</span> {DEFAULT_SELLER_NOTE}
-                      </span>
-                    )}
+                    <span>
+                      <span className="font-medium">Seller Note:</span>{" "}
+                      {enableSellerNoteEditing ? universalSellerNoteText : DEFAULT_SELLER_NOTE}
+                    </span>
                   </div>
                   
                   {/* Keyboard Shortcuts */}
