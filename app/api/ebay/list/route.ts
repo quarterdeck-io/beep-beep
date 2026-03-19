@@ -923,6 +923,41 @@ export async function POST(req: Request) {
       // Use defaults if policy fetch fails
     }
 
+    // Load global offer settings (Allow Offers + Minimum Offer Amount)
+    const offerSettings = await (prisma as any).offerSettings.findUnique({
+      where: { userId: session.user.id },
+    })
+    const allowOffers = !!offerSettings?.allowOffers
+    const minimumOfferAmount = Number(offerSettings?.minimumOfferAmount ?? 10.0)
+
+    console.log("[LIST API DEBUG] Offer settings loaded:", {
+      allowOffers,
+      minimumOfferAmount,
+      listingPrice: priceNum,
+    })
+
+    if (allowOffers) {
+      if (Number.isNaN(minimumOfferAmount) || minimumOfferAmount <= 0) {
+        return NextResponse.json(
+          {
+            error: "Minimum offer amount must be greater than 0 when Allow Offers is enabled.",
+            action: "invalid_offer_settings",
+          },
+          { status: 400 }
+        )
+      }
+
+      if (minimumOfferAmount >= priceNum) {
+        return NextResponse.json(
+          {
+            error: `Minimum offer amount ($${minimumOfferAmount.toFixed(2)}) must be lower than listing price ($${priceNum.toFixed(2)}).`,
+            action: "invalid_offer_settings",
+          },
+          { status: 400 }
+        )
+      }
+    }
+
     // Step 4: Create an offer
     // finalCategoryId is already determined during validation above
     
@@ -958,6 +993,16 @@ export async function POST(req: Request) {
       categoryId: finalCategoryId,
       availableQuantity: 1, // Explicit quantity (recommended)
       merchantLocationKey: merchantLocationKey, // Required for publishing
+    }
+
+    if (allowOffers) {
+      offerPayload.bestOfferTerms = {
+        bestOfferEnabled: true,
+        minimumBestOfferAmount: {
+          value: minimumOfferAmount.toFixed(2),
+          currency: "USD",
+        },
+      }
     }
     
     // Add listing policies if we have them
