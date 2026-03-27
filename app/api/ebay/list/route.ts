@@ -5,6 +5,56 @@ import { prisma } from "@/lib/prisma"
 export async function POST(req: Request) {
   console.log("[LIST API DEBUG] ========== LISTING REQUEST STARTED ==========")
   try {
+    const logOfferState = async (
+      baseUrl: string,
+      accessToken: string,
+      offerId: string,
+      label: string
+    ) => {
+      try {
+        const offerDetailsUrl = `${baseUrl}/sell/inventory/v1/offer/${offerId}`
+        const offerDetailsResponse = await fetch(offerDetailsUrl, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+            "Content-Language": "en-US",
+            "Accept-Language": "en-US",
+            "X-EBAY-C-MARKETPLACE-ID": "EBAY_US",
+          },
+        })
+
+        if (!offerDetailsResponse.ok) {
+          const detailsError = await offerDetailsResponse.json().catch(() => ({}))
+          console.warn(`[LIST API DEBUG] Offer state check failed (${label}):`, {
+            offerId,
+            status: offerDetailsResponse.status,
+            statusText: offerDetailsResponse.statusText,
+            detailsError,
+          })
+          return
+        }
+
+        const offerDetails = await offerDetailsResponse.json()
+        console.log(`[LIST API DEBUG] Offer state check (${label}):`, {
+          offerId,
+          bestOfferTerms: offerDetails?.bestOfferTerms || null,
+          pricingSummary: offerDetails?.pricingSummary || null,
+          marketplaceId: offerDetails?.marketplaceId || null,
+          categoryId: offerDetails?.categoryId || null,
+          listingPolicies: offerDetails?.listingPolicies || null,
+        })
+      } catch (offerStateError) {
+        console.warn(`[LIST API DEBUG] Offer state check exception (${label}):`, {
+          offerId,
+          error:
+            offerStateError instanceof Error
+              ? offerStateError.message
+              : String(offerStateError),
+        })
+      }
+    }
+
     // Check if user is authenticated
     const session = await auth()
     
@@ -1120,6 +1170,7 @@ export async function POST(req: Request) {
             console.log("✅ Existing offer updated successfully")
             // Use the existing offer ID to publish
             const offerId = existingOfferId
+            await logOfferState(baseUrl, accessToken, offerId, "AFTER_EXISTING_OFFER_UPDATE_BEFORE_PUBLISH")
             
             // Continue to Step 5: Publish the offer
             const publishUrl = `${baseUrl}/sell/inventory/v1/offer/${offerId}/publish`
@@ -1257,6 +1308,7 @@ export async function POST(req: Request) {
             }
             
             const publishData = await publishResponse.json()
+            await logOfferState(baseUrl, accessToken, offerId, "AFTER_EXISTING_OFFER_PUBLISH")
             
             // Update SKU counter after successful listing
             if (shouldIncrementCounter) {
@@ -1352,6 +1404,8 @@ export async function POST(req: Request) {
         { status: 500 }
       )
     }
+
+    await logOfferState(baseUrl, accessToken, offerId, "AFTER_OFFER_CREATE_BEFORE_PUBLISH")
 
     // Step 5: Publish the offer
     // Log what we're attempting to publish
@@ -1569,6 +1623,7 @@ export async function POST(req: Request) {
     console.log("[LIST API DEBUG] Publish Response Status:", publishResponse.status, publishResponse.statusText)
     
     const publishData = await publishResponse.json()
+    await logOfferState(baseUrl, accessToken, offerId, "AFTER_OFFER_PUBLISH")
     
     console.log("[LIST API DEBUG] Publish Response Data:", JSON.stringify(publishData, null, 2))
     console.log("[LIST API DEBUG] Listing ID:", publishData.listingId)
